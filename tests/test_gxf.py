@@ -10,7 +10,7 @@ Tests for `gxf` module.
 
 import unittest
 
-from gxf import gxf
+import gxf
 
 
 class TestGxf(unittest.TestCase):
@@ -19,7 +19,7 @@ class TestGxf(unittest.TestCase):
         pass
 
     def test_something(self):
-        pass
+        assert gxf.GDB == False
 
     def tearDown(self):
         pass
