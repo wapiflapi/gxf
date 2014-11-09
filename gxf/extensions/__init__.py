@@ -2,6 +2,7 @@
 
 import gxf
 
+
 @gxf.register(prefix=True)
 class Gx(gxf.Command):
     '''
@@ -18,3 +19,5 @@ class Gx(gxf.Command):
 
 with gxf.register.prefix("gx"):
     import gxf.extensions.reload
+    import gxf.extensions.meta
+    import gxf.extensions.testi

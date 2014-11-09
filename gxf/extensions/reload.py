@@ -5,18 +5,18 @@ import importlib
 
 import gxf
 
+
 @gxf.register()
-class Reload(gxf.Command):
+class Reload(gxf.MaintenanceCommand):
     '''
     This command can be used to reload packages from source.
     '''
 
     def setup(self, parser):
-        super().setup(parser)
-
         parser.add_argument(
             'package', nargs='*', default=['gxf', 'gxf.extensions'],
-            help='packages to be reloaded, defaults to gxf and gxf.extensions.')
+            help='packages to be reloaded, '
+            'defaults to gxf and gxf.extensions.')
 
     def run(self, args):
         toreload, toremove = set(), set()

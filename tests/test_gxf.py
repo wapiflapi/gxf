@@ -19,7 +19,7 @@ class TestGxf(unittest.TestCase):
         pass
 
     def test_something(self):
-        assert gxf.GDB == False
+        assert gxf.GDB is False
 
     def tearDown(self):
         pass
