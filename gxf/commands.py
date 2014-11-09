@@ -6,6 +6,8 @@ import traceback
 
 from contextlib import contextmanager
 
+# if you didn't get argcomplete from its git after my patches
+# where applied you should use the monkey patched version:
 # import gxf.mpargcomplete as argcomplete
 import argcomplete
 
@@ -73,6 +75,10 @@ class ValueType(object):
 
 class FileType(argparse.FileType):
     argcompleter = GdbCompleter(gdb.COMPLETE_FILENAME)
+
+
+class StrType(str):
+    argcompleter = GdbCompleter(gdb.COMPLETE_NONE)
 
 
 class ArgumentParser(argparse.ArgumentParser):
@@ -179,6 +185,11 @@ class Command(gdb.Command):
 
     def complete(self, text, word):
 
+        # We never want to fallback on readline.
+        # Even more so when argcomplete does this by calling bash -c compgen.
+        check_output = argcomplete.subprocess.check_output
+        argcomplete.subprocess.check_output = lambda *a, **k: b""
+
         (cword_prequote, cword_prefix, cword_suffix,
          comp_words, first_colon_pos) = argcomplete.split_line(text)
 
@@ -195,6 +206,9 @@ class Command(gdb.Command):
             # backtrace in this case, we print it ourself.
             traceback.print_exc()
             raise
+        finally:
+            # Don't forget we cheated, fix this and hope no one saw us.
+            argcomplete.subprocess.check_output = check_output
 
         # The characters used by gdb to decide what a 'word' is aren't
         # controled by us. We need to workaround this by ommiting the
