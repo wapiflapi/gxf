@@ -11,6 +11,8 @@ from contextlib import contextmanager
 # import gxf.mpargcomplete as argcomplete
 import argcomplete
 
+from gxf import inferiors
+
 import gdb
 
 
@@ -77,16 +79,44 @@ class FileType(argparse.FileType):
     argcompleter = GdbCompleter(gdb.COMPLETE_FILENAME)
 
 
-class StrType(str):
-    argcompleter = GdbCompleter(gdb.COMPLETE_NONE)
+class InferiorType(object):
+
+    @staticmethod
+    def argcompleter(prefix, **kwargs):
+        iids = [str(i.num) for i in inferiors.get_inferiors()]
+        return [i for i in iids if i.startswith(prefix)]
+
+    def __call__(self, arg):
+        try:
+            return inferiors.get_inferior_by_id(int(arg))
+        except (ValueError, KeyError) as e:
+            raise argparse.ArgumentTypeError(e)
 
 
 class ArgumentParser(argparse.ArgumentParser):
+
+    class JitDefault(object):
+
+        def __init__(self, dflt, *args, **kwargs):
+            self.dflt = dflt
+            self.args = args
+            self.kwargs = kwargs
+
+        def __call__(self):
+            return self.dflt(*self.args, **self.kwargs)
+
     def exit(self, code=None, message=None):
         if message is not None:
             sys.exit(message.strip())
         else:
             sys.exit(code)
+
+    def parse_args(self, *args, **kwargs):
+        args = super().parse_args(*args, **kwargs)
+        for key, value in args.__dict__.items():
+            if isinstance(value, self.JitDefault):
+                args.__dict__[key] = value()
+        return args
 
 
 class register(object):
@@ -100,7 +130,7 @@ class register(object):
         yield
         register.global_prefix.pop()
 
-    def __init__(self, cmdname=None, cmdtype=gdb.COMMAND_USER,
+    def __init__(self, cmdname=None, cmdtype=None,
                  repeat=False, prefix=False, parent=[]):
         self.cmdname = cmdname
         self.cmdtype = cmdtype
@@ -114,7 +144,8 @@ class register(object):
     def __call__(self, cmd):
         if self.cmdname is None:
             self.cmdname = cmd.__name__.lower()
-
+        if self.cmdtype is None:
+            self.cmdtype = cmd.gdb_class
         name = " ".join(self.global_prefix + self.parents + [self.cmdname])
         cmd(name, self.cmdtype, self.crepeat, self.cprefix)
         return cmd
@@ -122,8 +153,7 @@ class register(object):
 
 class Command(gdb.Command):
 
-    description = ""
-    epilog = ""
+    gdb_class = gdb.COMMAND_USER
 
     def __init__(self, cmdname, cmdtype, repeat, prefix):
 
@@ -162,6 +192,14 @@ class Command(gdb.Command):
     def setup(self, parser):
         pass
 
+    def setup_inferior(self, parser):
+        parser.add_argument(
+            '-i', '--inferior',
+            default=parser.JitDefault(inferiors.get_selected_inferior),
+            type=InferiorType(),
+            help="inferior id on which this command should act"
+            ", defaults to selected inferior.")
+
     def invoke(self, args, isatty):
 
         if not self.repeat:
@@ -181,7 +219,8 @@ class Command(gdb.Command):
         except gdb.GdbError:
             raise
         except:
-            traceback.print_exc()
+            # Gdb can't give us a full traceback.
+            print("%s" % (traceback.format_exc(),), end="")
 
     def complete(self, text, word):
 
@@ -198,14 +237,14 @@ class Command(gdb.Command):
         try:
             completions = self.completer._get_completions(
                 comp_words, cword_prefix, cword_prequote, first_colon_pos)
-
         except GdbCompleterRequired as e:
             return e.gdbcompleter
-        except:
+        except BaseException as e:
             # This is not expected, but gdb doesn't give us a
             # backtrace in this case, we print it ourself.
-            traceback.print_exc()
-            raise
+            print("\nAn exception occured during auto-completion code.")
+            print("%s> %s %s" % (traceback.format_exc(), self.cmdname, text), end="")
+            return []
         finally:
             # Don't forget we cheated, fix this and hope no one saw us.
             argcomplete.subprocess.check_output = check_output
@@ -216,3 +255,51 @@ class Command(gdb.Command):
         # The downside of this trick is we won't see the whole word
         # in gdb's listing, only what he considers the word...
         return [c[len(cword_prefix) - len(word):].strip() for c in completions]
+
+
+class NoneCommand(Command):
+    gdb_class = gdb.COMMAND_NONE
+
+
+class RunningCommand(Command):
+    gdb_class = gdb.COMMAND_RUNNING
+
+
+class DataCommand(Command):
+    gdb_class = gdb.COMMAND_DATA
+
+
+class StackCommand(Command):
+    gdb_class = gdb.COMMAND_STACK
+
+
+class FilesCommand(Command):
+    gdb_class = gdb.COMMAND_FILES
+
+
+class SupportCommand(Command):
+    gdb_class = gdb.COMMAND_SUPPORT
+
+
+class StatusCommand(Command):
+    gdb_class = gdb.COMMAND_STATUS
+
+
+class BreakpointsCommand(Command):
+    gdb_class = gdb.COMMAND_BREAKPOINTS
+
+
+class TracepointsCommand(Command):
+    gdb_class = gdb.COMMAND_TRACEPOINTS
+
+
+class UserCommand(Command):
+    gdb_class = gdb.COMMAND_USER
+
+
+class ObscureCommand(Command):
+    gdb_class = gdb.COMMAND_OBSCURE
+
+
+class MaintenanceCommand(Command):
+    gdb_class = gdb.COMMAND_MAINTENANCE
