@@ -4,7 +4,10 @@ import sys
 import argparse
 import traceback
 
-import gxf.mpargcomplete as argcomplete
+from contextlib import contextmanager
+
+# import gxf.mpargcomplete as argcomplete
+import argcomplete
 
 import gdb
 
@@ -82,15 +85,32 @@ class ArgumentParser(argparse.ArgumentParser):
 
 class register(object):
 
-    def __init__(self, cmdname, cmdtype=gdb.COMMAND_USER,
-                 repeat=False, prefix=False):
+    global_prefix = []
+
+    @staticmethod
+    @contextmanager
+    def prefix(prefix):
+        register.global_prefix.append(prefix)
+        yield
+        register.global_prefix.pop()
+
+    def __init__(self, cmdname=None, cmdtype=gdb.COMMAND_USER,
+                 repeat=False, prefix=False, parent=[]):
         self.cmdname = cmdname
         self.cmdtype = cmdtype
-        self.repeat = repeat
-        self.prefix = prefix
+        self.crepeat = repeat
+        self.cprefix = prefix
+
+        if not isinstance(parent, list):
+            parent = [parent]
+        self.parents = parent
 
     def __call__(self, cmd):
-        cmd(self.cmdname, self.cmdtype, self.repeat, self.prefix)
+        if self.cmdname is None:
+            self.cmdname = cmd.__name__.lower()
+
+        name = " ".join(self.global_prefix + self.parents + [self.cmdname])
+        cmd(name, self.cmdtype, self.crepeat, self.cprefix)
         return cmd
 
 
@@ -124,7 +144,7 @@ class Command(gdb.Command):
 
         # gdb generates its help from the docstring.
         # We temporarilly overwrite it with argparse's output.
-        old_doc, self.__doc__ = self.__doc__, self.parser.format_help()
+        old_doc, self.__doc__ = self.__doc__, self.parser.format_help().strip()
 
         # Call gdb's init. This will cause the command to be registerd.
         super().__init__(cmdname, cmdtype, prefix=prefix)

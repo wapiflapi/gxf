@@ -12,4 +12,4 @@ else:
     GDB = True
 
 if GDB:
-    from xgxf.commands import *
+    from gxf.commands import *
