@@ -6,14 +6,11 @@ import traceback
 
 from contextlib import contextmanager
 
-# if you didn't get argcomplete from its git after my patches
-# where applied you should use the monkey patched version:
-# import gxf.mpargcomplete as argcomplete
 import argcomplete
 
-from gxf import inferiors
-
 import gdb
+
+from gxf import inferiors
 
 
 class GdbCompleterRequired(Exception):
