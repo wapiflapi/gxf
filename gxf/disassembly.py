@@ -39,6 +39,7 @@ class GdbContextLexer(RegexLexer):
             (r'=>', Comment),
             (r'0x[0-9a-f]+', Comment, 'gx_location'),
             (r'[0-9a-f]{2}[ \t]', Comment.Special),
+            ('\(bad\)', Comment),
             ('.*\n', Other),
             ],
         'gx_location': [
@@ -319,6 +320,27 @@ def disassemble(startaddr, endaddr=None, hexdump=False, ignmemerr=False):
     data, msg = _disassemble(startaddr, endaddr, hexdump, ignmemerr)
     return Disassembly(data, msg=msg)
 
+
+def _check_data(data, addr):
+    lastbad = True
+    for i, line in enumerate(data.splitlines()):
+        if "(bad)" in line:
+            lastbad = i
+
+        # Get this line's address:
+        a, line = line.split(None, 1)
+        if a == "=>":
+            a, line = line.split(None, 1)
+        a = int(a.rstrip(':'), 0)
+
+        if a == addr:
+            return lastbad
+        if a > addr:
+            break
+
+    return None
+
+
 def disassemble_lines(addr, count=1, offset=0, hexdump=False, ignfct=False):
     addr = int(addr)
 
@@ -343,52 +365,66 @@ def disassemble_lines(addr, count=1, offset=0, hexdump=False, ignfct=False):
 
     if offset >= 0:
         # plain old linear sweep.
-        disafter = disassemble(addr+max(offset, 0), addr+max(offset, 0)+16*count,
+        disafter = disassemble(addr, addr + offset*16 + count*16,
                                hexdump=hexdump, ignmemerr=True)
-        return disafter[:count]
+        return disafter[offset:offset+count]
 
 
     # Now we need to use backwards disassembling hacks :-)
 
-    # we should implement a cache of the N last known instruction addresses
-    # then we could take backguess such that backguess_max < backguess < addr
-    # wher backguess is a known good address. (if not enough instructions repeat)
-    # For the moment we use backguess = backguess_max.
+    hexaddr = "%x" % addr # This has false positives, its not a problem.
 
     backguess = addr + offset*16 - 64 # 64 gives it time to automagically sync.
 
-    hexaddr = "%x" % addr # This has false positives, its not a problem.
-
     dbg_cnt = 0
 
-    done = False
-    while backguess <= addr:
-        data, msg = _disassemble(backguess, addr+offset+16*count, ignmemerr=False)
+    badblocks = []
 
-        # fast check:
-        if hexaddr not in data:
-            dbg_cnt += 1
-            backguess += 1
-            continue
+    baddr, bdata, bmsg = None, None, None
 
-        for line in data.splitlines():
-            if "(bad)" in line:
-                break
-
-            # Get this line's address:
-            a, line = line.split(None, 1)
-            if a == "=>":
-                a, line = line.split(None, 1)
-
-            if int(a, 0) == addr:
-                done = True
-                break
-
-        if done:
-            break
-
+    for backguess in range(backguess, backguess+16):
+        data, msg = _disassemble(backguess, backguess + count*16, ignmemerr=False)
         dbg_cnt += 1
-        backguess += 1
+
+        if hexaddr in data:
+            check = _check_data(data, addr)
+            if check is True:
+                break
+            if check is not None and check < baddr:
+                baddr, bdata, bmsg = check, data, msg
+
+    else:
+
+        # no dice, lets check if we have some matching targets that
+        # simply have some (bad)s. We'll take the furthest away.
+
+        if bdata is not None:
+            data, msg = bdata, bmsg
+
+        else:
+            # This stream is target address is probably fucked up, otherwise
+            # we would have synced already. Lets try this from the target,
+            # then we'll know soon if it is even possible to get there.
+
+            check = None
+            bads = 0
+
+            print(hex(addr), hex(addr + offset*16 - 1), hex(-1))
+            # We start at addr, that should give us at least one good one.
+            for backguess in range(addr, addr + offset*16 - 1, -1):
+                bdata, bmsg = _disassemble(backguess, backguess + count*16, ignmemerr=False)
+                dbg_cnt += 1
+
+                if hexaddr in bdata and _check_data(bdata, addr) is not None:
+                    # New best thing?
+                    data, msg = bdata, bmsg
+                    bads = 0
+                elif bads == 15:
+                    # We will never hit it again.
+                    break
+                else:
+                    bads += 1
+
 
     print("%d sync tries." % dbg_cnt)
     disassembly = Disassembly(data, msg=msg)

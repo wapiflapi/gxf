@@ -32,7 +32,10 @@ class LocationType(object):
     argcompleter = GdbCompleter(gdb.COMPLETE_LOCATION)
 
     def __call__(self, arg):
-        value = gdb.parse_and_eval(arg)
+        try:
+            value = gdb.parse_and_eval(arg)
+        except Exception as e:
+            raise argparse.ArgumentTypeError(e)
         if value.address is not None:
             value = value.address
         return value
@@ -70,10 +73,12 @@ class ValueType(object):
 
     def __call__(self, arg):
         try:
-            return gdb.parse_and_eval(arg)
+            value = gdb.parse_and_eval(arg)
         except Exception as e:
             raise argparse.ArgumentTypeError(e)
-
+        if value.address is not None:
+            value = value.address
+        return value
 
 class FileType(argparse.FileType):
     argcompleter = GdbCompleter(gdb.COMPLETE_FILENAME)
