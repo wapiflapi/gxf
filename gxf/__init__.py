@@ -13,3 +13,6 @@ else:
 
 if GDB:
     from gxf.commands import *
+    from gxf.disassembly import *
+    from gxf.errors import *
+    from gxf.basics import *

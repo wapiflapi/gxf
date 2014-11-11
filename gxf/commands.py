@@ -32,7 +32,10 @@ class LocationType(object):
     argcompleter = GdbCompleter(gdb.COMPLETE_LOCATION)
 
     def __call__(self, arg):
-        return arg
+        value = gdb.parse_and_eval(arg)
+        if value.address is not None:
+            value = value.address
+        return value
 
 
 class CommandType(object):
@@ -202,22 +205,33 @@ class Command(gdb.Command):
         if not self.repeat:
             self.dont_repeat()
 
+        self.parser.set_defaults(isatty=isatty)
+
         # Not sure we trust gdb to split the line as we want it, but
         # until there are problems we'll let him give it a shot.
         args = gdb.string_to_argv(args)
 
         try:
-            self.run(self.parser.parse_args(args))
+            args = self.parser.parse_args(args)
+            self.run(args)
         except SystemExit as e:
             if isinstance(e.code, str):
                 raise gdb.GdbError(e)
             elif e.code:
                 raise gdb.GdbError("command exited with status %s." % e.code)
         except gdb.GdbError:
+            # This type of error can be used to repport failure to gdb.
+            # We let is pass through so that applications can print errors.
+            # Still, the prefered way for an extension to do this
+            # would be to simply use exit().
             raise
-        except:
-            # Gdb can't give us a full traceback.
-            print("%s" % (traceback.format_exc(),), end="")
+        except BaseException as e:
+            if getattr(args, "isatty", True):
+                # Gdb can't give us a full traceback. If this is a tty
+                # or if error occured during argument parsing we do it.
+                print("%s" % (traceback.format_exc(),), end="")
+            else:
+                raise gdb.GdbError(e)
 
     def complete(self, text, word):
 
