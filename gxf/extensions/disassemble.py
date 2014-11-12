@@ -3,7 +3,6 @@
 import sys
 
 import gxf
-import pygments
 
 @gxf.register()
 class Disassemble(gxf.DataCommand):
@@ -25,22 +24,19 @@ class Disassemble(gxf.DataCommand):
     def run(self, args):
 
         if args.function:
-            disassembly = gxf.disassembly.disassemble(
-                args.what, None, args.hexdump)
+            disassembly = gxf.disassembly.disassemble(args.what, None)
         elif args.until is not None:
-            disassembly = gxf.disassembly.disassemble(
-                args.what, args.until, args.hexdump)
+            disassembly = gxf.disassembly.disassemble(args.what, args.until)
         else:
             disassembly = gxf.disassembly.disassemble_lines(
-                args.what, args.count + args.before, -args.before,
-                hexdump=args.hexdump, ignfct=args.real)
+                args.what, args.count + args.before, -args.before, ignfct=args.real)
 
         if args.verbose and disassembly.msg:
             print(disassembly.msg)
         elif not args.function:
             print("   ...")
 
-        disassembly.output()
+        disassembly.output(hexdump=args.hexdump)
 
         if not args.function:
             print("   ...")

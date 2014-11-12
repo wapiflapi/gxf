@@ -14,7 +14,78 @@ import gxf
 
 from contextlib import contextmanager
 
-class DisassemblyFlavour(gdb.Parameter):
+
+# TODO:
+# split in four files:
+#  - pygments: including default formatter but not disass specific stuff.
+#  - expression: stuff related to dealing with gfb.parse_and_eval and exps.
+#  - disassembly: everything else
+#  - flag related stuff, maybe a class you could do checks against ?
+
+
+
+def check_flags(inst):
+
+    # BOROWED FROM PEDA.
+    # Will do this later when putting it in a class in its own file etc...
+
+    # Eflags bit masks, source vdb
+    EFLAGS_CF = 1 << 0
+    EFLAGS_PF = 1 << 2
+    EFLAGS_AF = 1 << 4
+    EFLAGS_ZF = 1 << 6
+    EFLAGS_SF = 1 << 7
+    EFLAGS_TF = 1 << 8
+    EFLAGS_IF = 1 << 9
+    EFLAGS_DF = 1 << 10
+    EFLAGS_OF = 1 << 11
+
+    flags = {"CF":0, "PF":0, "AF":0, "ZF":0, "SF":0, "TF":0, "IF":0, "DF":0, "OF":0}
+    eflags = gdb.parse_and_eval("(int)$eflags")
+
+    flags["CF"] = bool(eflags & EFLAGS_CF)
+    flags["PF"] = bool(eflags & EFLAGS_PF)
+    flags["AF"] = bool(eflags & EFLAGS_AF)
+    flags["ZF"] = bool(eflags & EFLAGS_ZF)
+    flags["SF"] = bool(eflags & EFLAGS_SF)
+    flags["TF"] = bool(eflags & EFLAGS_TF)
+    flags["IF"] = bool(eflags & EFLAGS_IF)
+    flags["DF"] = bool(eflags & EFLAGS_DF)
+    flags["OF"] = bool(eflags & EFLAGS_OF)
+
+
+    if inst == "jmp":
+        return True
+    if inst == "je" and flags["ZF"]:
+        return True
+    if inst == "jne" and not flags["ZF"]:
+        return True
+    if inst == "jg" and not flags["ZF"] and (flags["SF"] == flags["OF"]):
+        return True
+    if inst == "jge" and (flags["SF"] == flags["OF"]):
+        return True
+    if inst == "ja" and not flags["CF"] and not flags["ZF"]:
+        return True
+    if inst == "jae" and not flags["CF"]:
+        return True
+    if inst == "jl" and (flags["SF"] != flags["OF"]):
+        return True
+    if inst == "jle" and (flags["ZF"] or (flags["SF"] != flags["OF"])):
+        return True
+    if inst == "jb" and flags["CF"]:
+        return True
+    if inst == "jbe" and (flags["CF"] or flags["ZF"]):
+        return True
+    if inst == "jo" and flags["OF"]:
+        return True
+    if inst == "jno" and not flags["OF"]:
+        return True
+    if inst == "jz" and flags["ZF"]:
+        return True
+    if inst == "jnz" and flags["OF"]:
+        return True
+
+class DisassemblyFlavor(gdb.Parameter):
 
     def __init__(self):
         self.message = gdb.execute("show disassembly-flavor", False, True).strip()
@@ -28,7 +99,7 @@ class DisassemblyFlavour(gdb.Parameter):
     def get_show_string(self, svalue):
         return self.message
 
-disassemblyflavour = DisassemblyFlavour()
+disassemblyflavor = DisassemblyFlavor()
 
 
 class GdbContextLexer(RegexLexer):
@@ -40,7 +111,7 @@ class GdbContextLexer(RegexLexer):
             (r'0x[0-9a-f]+', Comment, 'gx_location'),
             (r'[0-9a-f]{2}[ \t]', Comment.Special),
             ('\(bad\)', Comment),
-            ('.*\n', Other),
+            ('(.*?)(#.*)?(\n)', bygroups(Other, Comment, Other)),
             ],
         'gx_location': [
             ('[ \t]+', Text),
@@ -61,16 +132,12 @@ class GdbLexer(DelegatingLexer):
         }
 
     def __init__(self):
-        super().__init__(self.rootlexers[disassemblyflavour.value], GdbContextLexer)
+        super().__init__(self.rootlexers[disassemblyflavor.value], GdbContextLexer)
 
-    EXTRA_KEYWORDS = set(["PTR", "data16", "WORD", "HWORD", "DWORD", "QWORD", "XMMWORD"])
+    EXTRA_KEYWORDS = set(["PTR", "WORD", "HWORD", "DWORD", "FWORD", "QWORD", "XMMWORD"])
 
     EXTRA_BUILTINS = set(["r%d" % i for i in range(16)] +
                          ["xmm%d" % i for i in range(16)])
-
-    # TODO:
-    # Fix data16, rex.RB, stuff like that.
-    # also in att: and (?!)
 
     def get_tokens_unprocessed(self, text):
         for index, token, value in super().get_tokens_unprocessed(text):
@@ -78,6 +145,13 @@ class GdbLexer(DelegatingLexer):
                 yield index, Name.Builtin, value
             elif token is Name.Variable and value in self.EXTRA_KEYWORDS:
                 yield index, Keyword.Type, value
+            elif token is Punctuation:
+                for c in value:
+                    if c in "+-*/%^&":
+                        yield index, Operator, c
+                    else:
+                        yield index, token, c
+                    index += 1
             else:
                 yield index, token, value
 
@@ -103,6 +177,38 @@ class CurrentFunctiontFilter(Filter):
             elif ttype is Operator and value == "<":
                 maybe = True
             yield ttype, value
+
+class PrefixFilter(Filter):
+
+
+    prefixes = set(("ES", "CS", "NTAKEN", "SS", "DS", "TAKEN",
+                    "REX", "REX.B", "REX.X", "REX.XB", "REX.R", "REX.RB",
+                    "REX.RX", "REX.RXB", "REX.W", "REX.WB", "REX.WX",
+                    "REX.WXB", "REX.WR", "REX.WRB", "REX.WRX", "REX.WRXB",
+                    "FS", "ALTER", "GS", "LOCK",
+                    "REPNZ", "REP", "REPNZ", "REP", "REPZ", "REP", "REPZ", "REP",
+                    "data16", "addr16", "data32", "addr32"))
+
+    def filter(self, lexer, stream):
+
+        prefix = False
+        for ttype, value in stream:
+
+            if prefix and ttype is Name.Variable:
+                if value in self.prefixes:
+                    ttype = Keyword.Type
+                else:
+                    ttype = Name.Function
+
+            elif ttype is Name.Function and value in self.prefixes:
+                prefix = True
+                ttype = Keyword.Type
+
+            elif ttype is not Text:
+                prefix = False
+
+            yield ttype, value
+
 
 class AlignementFilter(Filter):
 
@@ -143,166 +249,345 @@ class AlignementFilter(Filter):
         yield from lexed
 
 
-class ControlFlowFilter(Filter):
-
-    phonycomments = (Comment, Keyword, Generic.Error,
-                     Generic.Inserted, Generic.Strong)
-
-    def filter(self, lexer, stream):
-
-        line = []
-        function = None
-        for ttype, value in stream:
-
-            entry = [ttype, value]
-            line.append(entry)
-
-            if function is None and ttype is Name.Function:
-                function = entry
-            if not "\n" in value:
-                continue
-
-            marking = Comment
-            if function is None:
-                pass # weird.
-            elif function[1].startswith("j"):
-                function[0] = marking = Keyword
-            elif function[1] == "syscall":
-                function[0] = marking = Generic.Error
-            elif "ret" in function[1]:
-                function[0] = marking = Generic.Error
-            elif "call" in function[1]:
-                function[0] = marking = Generic.Inserted
-            elif "cmp" in function[1] or "test" in function[1]:
-                marking = Generic.Strong
-
-
-            for entry in line:
-                # If bytecode should be an indicator of the instruction
-                # type we should add Commebt.Special in the following:
-                if entry[0] in (Comment, ):
-                    entry[0] = marking
-
-            yield from line
-            function = None
-            line = []
-
 currentfunctiontfilter = CurrentFunctiontFilter()
 lexer = GdbLexer()
+lexer.add_filter(PrefixFilter())
 lexer.add_filter(currentfunctiontfilter)
 lexer.add_filter(AlignementFilter())
-lexer.add_filter(ControlFlowFilter())
 
 formatter = TerminalFormatter(bg="dark")
 
 
-class Disassembly(object):
+class Expression(object):
 
-    def __init__(self, disassembly, lexer=lexer, msg=None):
 
-        if not disassembly:
-            self.lexed = []
-        elif isinstance(disassembly, list):
-            self.lexed = disassembly
-        elif disassembly:
-            current_function = msg.rsplit(None, 1)[-1][:-1]
-            with currentfunctiontfilter.current_function(current_function):
-                self.lexed = list(pygments.lex(disassembly, lexer))
+    def __init__(self, expression):
+        self.tokens = []
+        if isinstance(expression, list):
+            self.tokens = expression
+            self.text = "".join(v for t, v in expression)
+        elif expression:
+            self.text = expression
+            raise NotImplementedError("Can't create Expression from text yet.")
 
-        self.msg = msg
-        self._lines = None
-
-    @property
-    def lines(self):
-        if self._lines is not None:
-            return self._lines
-
-        lines = []
-
-        count = 0
-        address = None
-
-        for i, token in enumerate(self.lexed):
-            count += 1
-
-            if address is None and token[0] in ControlFlowFilter.phonycomments:
-                try:
-                    address = int(token[1], 0)
-                except ValueError:
-                    pass
-            if "\n" in token[1]:
-                if address is None:
-                    # print(len(self.lexed), i, count, self.lexed[i-count+1:i+1])
-                    raise RuntimeError("Assembly line without address.")
-                lines.append((i-count+1, count, address))
-                count = 0
-                address = None
-
-        self._lines = lines
-        return self._lines
-
-    def get_addr_for_line(self, line):
-        return self.lines[line][2]
-
-    def get_line_for_addr(self, addr):
-        best = None
-        for i, line in enumerate(self.lines):
-            if line[2] > addr:
-                break
-            best = i
-
-        return best
+    def fmttokens(self):
+        yield from self.tokens
 
     def format(self, formatter=formatter):
-        return pygments.format(self.lexed, formatter)
+        return pygments.format(self.fmttokens(), formatter)
 
     def output(self):
         print(self.format(), end="")
+
+    def eval(self):
+        return gdb.parse_and_eval(self.text)
+
+
+
+JMP = "jmp"
+CALL = "call"
+SYSCALL = "syscall"
+RET = "ret"
+TEST = "test"
+
+class DisassemblyLine(object):
+
+    formatting = {
+        JMP: Keyword,
+        CALL: Generic.Inserted,
+        SYSCALL: Generic.Inserted,
+        RET: Generic.Error,
+        TEST: Generic.Strong,
+        }
+
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.address = None
+        self.inst = None
+        self.instidx = None
+
+        self.bytecode = []
+
+        self.current = False
+
+        next_is_function = False
+        for i, (ttype, value) in enumerate(tokens):
+            if ttype is Comment and self.address is None:
+                if value == "=>":
+                    self.current = True
+                else:
+                    self.address = int(value, 0)
+
+            if ttype is Comment.Special:
+                self.bytecode.extend(int(v, 16) for v in value.split())
+
+            if ttype is Name.Function:
+
+                self.inst = value
+                self.instidx = i
+
+        self.bytecode = bytes(self.bytecode)
+
+        if self.inst is None:
+            self.itype = None
+        elif self.inst.startswith("j"):
+            self.itype = JMP
+        elif self.inst.startswith("call"):
+            self.itype = CALL
+        elif self.inst.startswith("syscall"):
+            self.itype = SYSCALL
+        elif "ret" in self.inst:
+            self.itype = RET
+        elif "cmp" in self.inst or self.inst == "test":
+            self.itype = TEST
+        else:
+            self.itype = None
+
+
+    def fmttokens(self, hexdump=False):
+
+        gstyle = Generic.Heading if self.current else None
+        style = self.formatting.get(self.itype)
+
+        for ttype, value in self.tokens:
+            if not hexdump and ttype is Comment.Special:
+                continue
+            # If bytecode should be an indicator of the instruction
+            # type we should add Comment.Special in the following:
+            if style and ttype in (Comment, ):
+                ttype = style
+            if gstyle:
+                ttype = gstyle
+            yield ttype, value
+
+    def format(self, formatter=formatter, hexdump=False):
+        return pygments.format(self.fmttokens(hexdump=hexdump), formatter)
+
+    def get_expression(self):
+
+        types = []
+        tokens = []
+
+        start = self.instidx
+        while self.tokens[start][0] is not Text:
+            start += 1
+
+        for t, v in self.tokens[start:]:
+            if tokens and t is Text:
+                break
+            if t is Text:
+                pass
+            elif t is Token.Keyword.Type:
+                types.append((t, v))
+            else:
+                tokens.append((t, v))
+
+        # TODO: we probably have no need for properly lexed expressions =D
+        # check if it improves speed significantly to make it optional.
+
+        instsz = 6
+
+        ctokens = []
+
+        if disassemblyflavor.value == "intel":
+
+            relative = False
+
+            # This is the easy one.
+            for t, v in tokens:
+
+                if v == "[":
+
+                    ctokens.append((Token.Operator, "*"))
+                    ctokens.append((Token.Punctuation, "("))
+
+                    # should convert types to cast here.
+                    ctokens.append((Token.Keyword.Type, "void"))
+                    ctokens.append((Token.Operator, "*"))
+
+                    ctokens.append((Token.Operator, "*"))
+                    ctokens.append((Token.Punctuation, ")"))
+
+                    ctokens.append((Token.Punctuation, "("))
+
+                elif v == "]":
+                    ctokens.append((Token.Punctuation, ")"))
+                elif t in (Token.Name.Variable, Token.Name.Builtin):
+                    if v in ("eip", "rip", "pc"):
+                        ctokens.append((Token.Punctuation, "("))
+                        ctokens.append((t, "$%s" % v))
+                        ctokens.append((Token.Operator, "+"))
+                        ctokens.append((Token.Literal.Number, "%d" % instsz))
+                        ctokens.append((Token.Punctuation, ")"))
+                    else:
+                        ctokens.append((t, "$%s" % v))
+
+                else:
+                    ctokens.append((t, v))
+
+        elif disassemblyflavor.value == "att":
+            # This is the hard one: *-0xadc0000(%rbp,%rcx,1)
+            # * is option == relative or not
+            # then its offset(base, step, times) which translates to:
+            # [$pc +] offset + base + step * times
+
+            args = []
+            relative = True
+            for t, v in tokens:
+
+                if v == "*":
+                    relative = False
+
+                elif v == "(":
+
+                    base = ctokens
+                    ctokens = []
+
+                    ctokens.append((Token.Operator, "*"))
+                    ctokens.append((Token.Punctuation, "("))
+
+                    # should convert types to cast here.
+                    ctokens.append((Token.Keyword.Type, "void"))
+                    ctokens.append((Token.Operator, "*"))
+
+                    ctokens.append((Token.Operator, "*"))
+                    ctokens.append((Token.Punctuation, ")"))
+                    ctokens.append((Token.Punctuation, "("))
+
+                    ctokens.extend(base)
+
+                    args = [(Token.Operator, "+"),
+                            (Token.Operator, "+"),
+                            (Token.Operator, "*")]
+
+                elif v == ")":
+                    ctokens.append((Token.Punctuation, ")"))
+                    args = []
+                elif v == ",":
+                    del args[0]
+
+                else:
+                    if args and t is not Operator:
+                        ctokens.append(args[0])
+
+                    if t is Name.Variable:
+
+                        if v.startswith("%"):
+                            v = "$%s" % v[1:]
+
+                            if (v == "$riz" or v == "$eiz"):
+                                ctokens.append((Token.Literal.Number, "0"))
+
+                            elif v in ("$eip", "$rip", "$pc"):
+                                ctokens.append((Token.Punctuation, "("))
+                                ctokens.append((t, "%s" % v))
+                                ctokens.append((Token.Operator, "+"))
+                                ctokens.append((Token.Literal.Number, "%d" % instsz))
+                                ctokens.append((Token.Punctuation, ")"))
+                            else:
+                                ctokens.append((t, v))
+
+                    else:
+                        ctokens.append((t, v))
+
+
+        else:
+            assert False, "not intel or att."
+
+
+        if relative:
+            if not len(ctokens) == 1 and ctokens[0][0] is Number.Integer:
+
+                ctokens = [(Token.Name.Variable, "$pc"),
+                           (Token.Operator, "+")
+                           ] + ctokens
+
+
+        return Expression(ctokens)
+
+
+    def get_heading(self, stack="$rsp"):
+
+        # We need three primitives:
+        #   compute_jmp_addr  (flags + expression)
+        #   compute_ret_addr  (from stack)
+        #   compute_call_addr (expression)
+
+        if self.itype is RET:
+            return gdb.parse_and_eval("*(void **) (%s)" % stack)
+
+        if self.itype is CALL or (self.itype is JMP and check_flags(self.inst)):
+            exp = self.get_expression()
+            val = exp.eval()
+            return val
+
+
+
+class DisassemblyBlock(object):
+
+    def __init__(self, disassembly, lexer=lexer, msg=None):
+
+        self.lines = []
+        if isinstance(disassembly, list):
+            self.lines = disassembly
+        elif disassembly:
+            line = []
+            if msg:
+                current_function = msg.rsplit(None, 1)[-1][:-1]
+            else:
+                current_function = None
+            with currentfunctiontfilter.current_function(current_function):
+                for ttype, value in pygments.lex(disassembly, lexer):
+                    line.append((ttype, value))
+                    if '\n' in value:
+                        self.lines.append(DisassemblyLine(line))
+                        line = []
+
+        self.linenos = {}
+        for i, line in enumerate(self.lines):
+            self.linenos[line.address] = line, i
+
+        self.lexer = lexer
+        self.msg = msg
+
+    def get_lineno_for_addr(self, addr):
+        best = None, None
+        for i, line in enumerate(self.lines):
+            if line.address > addr:
+                break
+            best = line, i
+        return best
+
+    def fmttokens(self, hexdump=False, start=None, stop=None):
+        for line in self.lines[start:stop]:
+            yield from line.fmttokens(hexdump=hexdump)
+
+    def format(self, formatter=formatter, hexdump=False, start=None, stop=None):
+        return pygments.format(self.fmttokens(start=start, hexdump=hexdump, stop=stop), formatter)
+
+    def output(self, hexdump=False):
+        print(self.format(hexdump=hexdump), end="")
 
     def __len__(self):
         return len(self.lines)
 
     def __getitem__(self, key):
-        copy = Disassembly(self.lexed, msg=self.msg)
-        copy.truncate(key)
-        return copy
-
-    def truncate(self, key, *args):
-        if not isinstance(key, slice):
-            key = slice(max(key, 0), *args)
-
-        lines = self.lines[key]
-        if lines:
-            self.lexed = self.lexed[lines[0][0]:lines[-1][0]+lines[-1][1]]
-        else:
-            self.lexed = []
-
-        self._lines = None
-        return self
+        assert isinstance(key, slice)
+        key = slice(max(key.start, 0), key.stop, 1)
+        return DisassemblyBlock(self.lines[key], self.lexer, self.msg)
 
 
-    def __truncate_addr(self, startline=None, endline=None, startaddr=None, endaddr=None):
-
-        # untested.
-
-        startl, endl = startline, endline
-        for i in range(len(self)):
-            lineaddr = self.get_lineaddr(i)
-
-            if (startaddr and lineaddr > startaddr) and (endaddr and lineaddr >= endaddr):
-                break
-
-            if startline is None and startaddr is not None and lineaddr <= startaddr:
-                startl = i
-            if endline is None and endaddr is not None and lineaddr < endaddr:
-                endl = i
-
-        return self.truncate(startl, endl)
+    def __iter__(self):
+        yield from self.lines
 
 
-# disassemble is a direct wrapper for gdb's disassemble.
 
-def _disassemble(startaddr, endaddr=None, hexdump=False, ignmemerr=False):
+
+
+
+# _disassemble is a direct wrapper for gdb's disassemble.
+
+def _disassemble(startaddr, endaddr=None, hexdump=True, ignmemerr=False):
     modifier = " /r" if hexdump else ""
     what = ",".join(str(int(addr)) for addr in (startaddr, endaddr) if addr)
     try:
@@ -311,14 +596,14 @@ def _disassemble(startaddr, endaddr=None, hexdump=False, ignmemerr=False):
         if not ignmemerr:
             raise
         # if failaddr == startaddr this will return nothing.
-        return disassemble(startaddr, e.address, hexdump)
+        return _disassemble(startaddr, e.address, hexdump)
 
     start, end = data.find('\n')+1, data.rfind('\n', 0, -1)
     return data[start:end], data[:start-1]
 
-def disassemble(startaddr, endaddr=None, hexdump=False, ignmemerr=False):
-    data, msg = _disassemble(startaddr, endaddr, hexdump, ignmemerr)
-    return Disassembly(data, msg=msg)
+def disassemble(startaddr, endaddr=None, ignmemerr=False):
+    data, msg = _disassemble(startaddr, endaddr, True, ignmemerr)
+    return DisassemblyBlock(data, msg=msg)
 
 
 def _check_data(data, addr):
@@ -340,22 +625,21 @@ def _check_data(data, addr):
 
     return None
 
-
-def disassemble_lines(addr, count=1, offset=0, hexdump=False, ignfct=False):
+def disassemble_lines(addr, count=1, offset=0, ignfct=False):
     addr = int(addr)
 
     if ignfct is False:
 
         try:
-            disfct = disassemble(addr, hexdump=hexdump)
-            line = disfct.get_line_for_addr(addr)
-            assert line is not None, "addr should be in function."
+            disfct = disassemble(addr)
+            _, ln = disfct.get_lineno_for_addr(addr)
+            assert ln is not None, "addr should be in function."
             # If offset is outside of function we don't to fallback.
             # If the user wanted that he should have:
             #   - used ignfct if he wanted an exact match (if possible).
             #   - passed addr=addr+offset if he wanted results
             #     always including addr. .
-            return disfct.truncate(line+offset, line+offset+count)
+            return disfct[ln+offset:ln+offset+count]
         except gxf.MemoryError:
             raise # Nothing we can do about this.
         except gdb.error:
@@ -365,8 +649,7 @@ def disassemble_lines(addr, count=1, offset=0, hexdump=False, ignfct=False):
 
     if offset >= 0:
         # plain old linear sweep.
-        disafter = disassemble(addr, addr + offset*16 + count*16,
-                               hexdump=hexdump, ignmemerr=True)
+        disafter = disassemble(addr, addr + offset*16 + count*16, ignmemerr=True)
         return disafter[offset:offset+count]
 
 
@@ -390,12 +673,12 @@ def disassemble_lines(addr, count=1, offset=0, hexdump=False, ignfct=False):
             check = _check_data(data, addr)
             if check is True:
                 break
-            if check is not None and check < baddr:
+            if check is not None and (baddr is None or check < baddr):
                 baddr, bdata, bmsg = check, data, msg
 
     else:
 
-        # no dice, lets check if we have some matching targets that
+        # No dice, lets check if we have some matching targets that
         # simply have some (bad)s. We'll take the furthest away.
 
         if bdata is not None:
@@ -412,7 +695,8 @@ def disassemble_lines(addr, count=1, offset=0, hexdump=False, ignfct=False):
             print(hex(addr), hex(addr + offset*16 - 1), hex(-1))
             # We start at addr, that should give us at least one good one.
             for backguess in range(addr, addr + offset*16 - 1, -1):
-                bdata, bmsg = _disassemble(backguess, backguess + count*16, ignmemerr=False)
+                bdata, bmsg = _disassemble(backguess, backguess + count*16,
+                                           ignmemerr=False)
                 dbg_cnt += 1
 
                 if hexaddr in bdata and _check_data(bdata, addr) is not None:
@@ -425,18 +709,56 @@ def disassemble_lines(addr, count=1, offset=0, hexdump=False, ignfct=False):
                 else:
                     bads += 1
 
-
-    print("%d sync tries." % dbg_cnt)
-    disassembly = Disassembly(data, msg=msg)
-    line = disassembly.get_line_for_addr(addr)
-    print(len(disassembly), line, offset, count)
-    assert line is not None, "addr should be in function."
-    return disassembly.truncate(line+offset, line+offset+count)
-
-    return
+    # print("%d sync tries." % dbg_cnt)
+    disassembly = DisassemblyBlock(data, msg=msg)
+    _, ln = disassembly.linenos[addr]
+    # print(len(disassembly), ln, offset, count)
+    assert ln is not None, "addr should be in function."
+    return disassembly[ln+offset:ln+offset+count]
 
 # Ideas for names for the next function:
 # live
 # real time , rt
 # context
 #
+# qira inspired: idump, itrace ?
+
+def disassemble_heading(addr, count=10, offset=0):
+
+    addr = int(addr)
+
+    if offset > 0:
+        raise NotImplementedError("heading w/ offset > 0 doesn't make sense right?")
+
+    disassembly = disassemble_lines(addr, count, offset, ignfct=True)
+
+
+    heading = None
+
+    for i, line in enumerate(disassembly):
+        print(line.format(), end='')
+
+        heading = line.get_heading()
+        if heading is not None:
+            break
+
+    if heading:
+
+        print("  > discontinuous:")
+
+        disassembly2 = disassemble_lines(heading, count-i, ignfct=True)
+        print(disassembly2.format(), end='')
+
+        print("  # alternative:")
+
+
+    print(disassembly.format(start=i+1), end='')
+
+    # Once we have those its easy:
+    #  - start at pc (not addr+offset) go line by line
+    #  - if jmp, ret or call: compute addr and recurse over there
+    #  - indent block returned by recursion, append normal followup (non indented)
+    #  - do this while we don't have count lines.
+
+
+
