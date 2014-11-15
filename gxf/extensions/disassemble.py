@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import sys
-
 import gxf
+
 
 @gxf.register()
 class Disassemble(gxf.DataCommand):
@@ -29,7 +28,8 @@ class Disassemble(gxf.DataCommand):
             disassembly = gxf.disassembly.disassemble(args.what, args.until)
         else:
             disassembly = gxf.disassembly.disassemble_lines(
-                args.what, args.count + args.before, -args.before, ignfct=args.real)
+                args.what, args.count + args.before, -args.before,
+                ignfct=args.real)
 
         if args.verbose and disassembly.msg:
             print(disassembly.msg)

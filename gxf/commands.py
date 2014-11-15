@@ -80,6 +80,7 @@ class ValueType(object):
             value = value.address
         return value
 
+
 class FileType(argparse.FileType):
     argcompleter = GdbCompleter(gdb.COMPLETE_FILENAME)
 
@@ -259,7 +260,8 @@ class Command(gdb.Command):
             # This is not expected, but gdb doesn't give us a
             # backtrace in this case, we print it ourself.
             print("\nAn exception occured during auto-completion code.")
-            print("%s> %s %s" % (traceback.format_exc(), self.cmdname, text), end="")
+            print("%s> %s %s" % (traceback.format_exc(), self.cmdname, text),
+                  end="")
             return []
         finally:
             # Don't forget we cheated, fix this and hope no one saw us.

@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 
-import sys
-
 import gdb
 import gxf
+
 
 @gxf.register()
 class Pae(gxf.UserCommand):
@@ -17,15 +16,12 @@ class Pae(gxf.UserCommand):
 
     def run(self, args):
 
-
         if not args.asm:
             try:
                 print(gdb.parse_and_eval(args.what))
             except gxf.GdbError as e:
                 exit(e)
             return
-
-
 
         fakei = "test %s" % args.what
         disass = gxf.disassembly.DisassemblyBlock(fakei)
@@ -37,4 +33,3 @@ class Pae(gxf.UserCommand):
             print(expression.eval())
         except gxf.GdbError as e:
             exit(e)
-
