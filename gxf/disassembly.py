@@ -469,6 +469,9 @@ class DisassemblyLine(gxf.Formattable):
 
 class DisassemblyBlock(gxf.Formattable):
 
+    # TODO: lexing is slow (seems legit)
+    # check if we can speed this up.
+
     def __init__(self, disassembly, lexer=lexer, msg=None):
 
         self.lines = []
@@ -527,7 +530,7 @@ def _disassemble(startaddr, endaddr=None, hexdump=True, ignmemerr=False):
     #   - we can't limit on function bounds as we do now.
 
     modifier = " /r" if hexdump else ""
-    what = ",".join(str(int(addr)) for addr in (startaddr, endaddr) if addr)
+    what = ",".join(hex(int(addr)) for addr in (startaddr, endaddr) if addr)
     try:
         data = gxf.execute("disassemble%s %s" % (modifier, what), False, True)
     except gxf.MemoryError as e:
@@ -604,10 +607,67 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
 
     badblocks = []
     baddr, bdata, bmsg = None, None, None
+    check = False
 
-    for backguess in range(backguess, backguess + 16):
-        data, msg = _disassemble(backguess, backguess + count * 16,
-                                 ignmemerr=False)
+    guesslimit = backguess + 16
+    while backguess < guesslimit:
+
+        try:
+            data, msg = _disassemble(backguess, addr + count * 16,
+                                     ignmemerr=False)
+        except gxf.MemoryError as e:
+            # Shit, we're on the edge. We don't know how far, both directions
+            # might take a realy long time without a way to know if we will
+            # endup hitting something.
+            # To address this we do a binary search at this point and fast
+            # forward backguess and adjust guesslimit to 16.
+
+            # We do sacrifice log2(N) disassemblies. (sorry about that...)
+
+            # There is a twist to this binary search: We try to snap to
+            # 2**10 boundaries when crossed, there is a good chance that's
+            # the place we're looking for anyway. That means two things:
+            # - if % align was succesfull check % align - 1 instead of /2.
+            # - elif % align in what we're skipping check it instead of /2.
+
+            align = 4096
+
+            validmem = addr
+            # we know current backguess is invalid, start at:
+            nextguess = backguess + (validmem - backguess) // 2
+
+            while backguess != nextguess:
+
+                try:
+                    _disassemble(nextguess, addr + count * 16, ignmemerr=False)
+                except gxf.MemoryError as e:
+                    backguess = nextguess
+                else:
+                    validmem = nextguess
+
+                # if we cross a boundary, we want to snap to the align.
+
+                if backguess == nextguess and nextguess % align == align - 1:
+                    # If we failed right before the boundary check we now
+                    # must check the boundary itself.
+                    nextguess += 1
+
+                else:
+                    # Otherwise normal split.
+                    nextguess = backguess + (validmem - backguess) // 2
+
+                    # But try to snap to boundary - 1 if possible:
+                    # (then when it fails we'll be able to check next one.)
+                    crossing = nextguess - (nextguess % align) + align - 1
+                    if backguess < crossing < validmem:
+                        nextguess = crossing
+
+
+            # Ok new limits after BS, we need to start this over:
+            backguess = validmem
+            guesslimit = backguess + 16
+            continue
+
 
         if hexaddr in data:
             check = _check_data(data, addr)
@@ -616,46 +676,54 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
             if check is not None and (baddr is None or check < baddr):
                 baddr, bdata, bmsg = check, data, msg
 
-    else:
+        backguess += 1
 
+    if check is True:
+        # Ok be found something already.
+        pass
+
+    elif bdata is not None:
         # No dice, lets check if we have some matching targets that
         # simply have some (bad)s. We'll take the furthest away.
+        data, msg = bdata, bmsg
 
-        if bdata is not None:
-            data, msg = bdata, bmsg
+    else:
+        # This stream's target address is probably fucked up, otherwise
+        # we would have synced already. Lets try this from the target,
+        # then we'll know soon if it is even possible to get there.
 
-        else:
-            # This stream is target address is probably fucked up, otherwise
-            # we would have synced already. Lets try this from the target,
-            # then we'll know soon if it is even possible to get there.
+        check = None
+        bads = 0
 
-            check = None
-            bads = 0
+        # We start at addr, that should give us at least one good one.
+        for backguess in range(addr, addr + offset * 16 - 1, -1):
 
-            print(hex(addr), hex(addr + offset * 16 - 1), hex(-1))
-            # We start at addr, that should give us at least one good one.
-            for backguess in range(addr, addr + offset * 16 - 1, -1):
+            try:
                 bdata, bmsg = _disassemble(backguess, backguess + count * 16,
                                            ignmemerr=False)
+            except gxf.MemoryError as e:
+                break
 
-                if hexaddr in bdata and _check_data(bdata, addr) is not None:
-                    # New best thing?
-                    data, msg = bdata, bmsg
-                    bads = 0
-                elif bads == 15:
-                    # We will never hit it again.
-                    break
-                else:
-                    bads += 1
+            if hexaddr in bdata and _check_data(bdata, addr) is not None:
+                # New best thing?
+                data, msg = bdata, bmsg
+                bads = 0
+            elif bads == 15:
+                # We will never hit it again.
+                break
+            else:
+                bads += 1
 
     disassembly = DisassemblyBlock(data, msg=msg)
     _, ln = disassembly.linenos[addr]
-    # print(len(disassembly), ln, offset, count)
     assert ln is not None, "addr should be in function."
     return disassembly[ln + offset:ln + offset + count]
 
 
 def disassemble_heading(addr, count=10, offset=0):
+
+    # TODO: Don't print in here. return a blockchain.
+    # no idea what that should look like, but *objects*.
 
     addr = int(addr)
 

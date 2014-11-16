@@ -3,8 +3,11 @@
 import gdb
 import gxf
 
+debug = False
 
 def execute(cmd, tty=False, tostr=True):
+
+    if debug: print("[debug] execute: %s" % cmd)
 
     try:
         return gdb.execute(cmd, tty, tostr)
@@ -13,6 +16,8 @@ def execute(cmd, tty=False, tostr=True):
 
 
 def parse_and_eval(*args, **kwargs):
+    if debug: print("[debug] pae: %s" % cmd)
+
     return gdb.parse_and_eval(*args, **kwargs)
 
 
