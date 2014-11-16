@@ -521,6 +521,11 @@ class DisassemblyBlock(gxf.Formattable):
 # _disassemble is a direct wrapper for gdb's disassemble.
 
 def _disassemble(startaddr, endaddr=None, hexdump=True, ignmemerr=False):
+    # TODO: We might want to use Architecture.disassemble
+    # problems with that:
+    #   - not sure how to get hexdump
+    #   - we can't limit on function bounds as we do now.
+
     modifier = " /r" if hexdump else ""
     what = ",".join(str(int(addr)) for addr in (startaddr, endaddr) if addr)
     try:
@@ -603,7 +608,6 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
     for backguess in range(backguess, backguess + 16):
         data, msg = _disassemble(backguess, backguess + count * 16,
                                  ignmemerr=False)
-        dbg_cnt += 1
 
         if hexaddr in data:
             check = _check_data(data, addr)

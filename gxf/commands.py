@@ -221,10 +221,10 @@ class Command(gdb.Command):
             args = self.parser.parse_args(args)
             self.run(args)
         except SystemExit as e:
-            if isinstance(e.code, str):
-                raise gdb.GdbError(e)
-            elif e.code:
+            if isinstance(e.code, int):
                 raise gdb.GdbError("command exited with status %s." % e.code)
+            elif e.code:
+                raise gdb.GdbError(str(e))
         except gdb.GdbError:
             # This type of error can be used to repport failure to gdb.
             # We let is pass through so that applications can print errors.

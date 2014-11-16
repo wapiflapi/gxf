@@ -22,6 +22,7 @@ with gxf.register.prefix("gx"):
     import gxf.extensions.meta
     import gxf.extensions.testi
 
+    import gxf.extensions.telescope
     import gxf.extensions.disassemble
     import gxf.extensions.heading
     import gxf.extensions.pae

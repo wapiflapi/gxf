@@ -23,7 +23,10 @@ class Disassemble(gxf.DataCommand):
     def run(self, args):
 
         if args.function:
-            disassembly = gxf.disassembly.disassemble(args.what, None)
+            try:
+                disassembly = gxf.disassembly.disassemble(args.what, None)
+            except gxf.GdbError as e:
+                exit(e)
         elif args.until is not None:
             disassembly = gxf.disassembly.disassemble(args.what, args.until)
         else:
