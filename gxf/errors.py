@@ -4,7 +4,6 @@ import gdb
 
 GdbError = gdb.error
 
-
 class MemoryError(gdb.MemoryError):
     def __init__(self, address, msg="Cannot access memory at address {:#x}"):
 
@@ -13,5 +12,4 @@ class MemoryError(gdb.MemoryError):
             self.__cause__ = None
 
         self.address = address
-        super().__init__(msg.format(self.address))
-
+        super().__init__(msg.format(int(self.address)))

@@ -431,9 +431,9 @@ class DisassemblyLine(gxf.Formattable):
                 tokens.append((t, v))
 
         if disassemblyflavor.value == "intel":
-            ctokens, relative = self._convert_intel()
+            ctokens, relative = self._convert_intel(tokens)
         elif disassemblyflavor.value == "att":
-            ctokens, relative = self._convert_att()
+            ctokens, relative = self._convert_att(tokens)
         else:
             assert False, "not intel or att."
 
@@ -485,10 +485,11 @@ class DisassemblyBlock(gxf.Formattable):
                 current_function = None
             with currentfunctiontfilter.current_function(current_function):
                 for ttype, value in pygments.lex(disassembly, lexer):
-                    line.append((ttype, value))
                     if '\n' in value:
                         self.lines.append(DisassemblyLine(line))
                         line = []
+                    else:
+                        line.append((ttype, value))
 
         self.linenos = {}
         for i, line in enumerate(self.lines):
@@ -508,6 +509,10 @@ class DisassemblyBlock(gxf.Formattable):
     def fmttokens(self, hexdump=False, start=None, stop=None):
         for line in self.lines[start:stop]:
             yield from line.fmttokens(hexdump=hexdump)
+            yield (Token.Text, "\n")
+
+    def output(self, *args, **kwargs):
+        print(self.format(*args, **kwargs), end="")
 
     def __len__(self):
         return len(self.lines)
@@ -735,7 +740,11 @@ def disassemble_heading(addr, count=10, offset=0):
     heading = None
 
     for i, line in enumerate(disassembly):
-        print(line.format(), end='')
+        line.output()
+
+        if i < -offset:
+            # not interested in headings before current addr.
+            continue
 
         heading = line.get_heading()
         if heading is not None:
@@ -747,7 +756,7 @@ def disassemble_heading(addr, count=10, offset=0):
 
         disassembly2 = disassemble_lines(heading, count - i, ignfct=True)
         for line in disassembly2:
-            print(line.format(), end='')
+            line.output()
             if line.itype is RET:
                 break
 

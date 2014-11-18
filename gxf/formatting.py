@@ -18,4 +18,4 @@ class Formattable(object):
         return pygments.format(self.fmttokens(*args, **kwargs), formatter)
 
     def output(self, *args, **kwargs):
-        print(self.format(*args, **kwargs), end="")
+        print(self.format(*args, **kwargs), end="\n")

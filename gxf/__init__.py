@@ -18,3 +18,4 @@ if GDB:
     from gxf.disassembly import *
     from gxf.errors import *
     from gxf.cpu import *
+    from gxf.memory import *
