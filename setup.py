@@ -39,7 +39,7 @@ setup(
         'Programming Language :: Python :: 3.4',
     ],
 
-    packages=['gxf'],
+    packages=['gxf', 'gxf.extensions'],
     package_dir={'gxf': 'gxf'},
     include_package_data=True,
     install_requires=requirements,
