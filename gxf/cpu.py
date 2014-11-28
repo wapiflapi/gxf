@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import collections
 import gxf
 
 def get_addrsz():
@@ -20,7 +21,7 @@ class Registers(object):
     def __init__(self):
         data = gxf.execute("info registers", False, True)
 
-        self.regs = {}
+        self.regs = collections.OrderedDict()
         for l in data.splitlines():
             sl = l.split(None, 2)
             self.regs[sl[0]] = int(sl[1], 0)

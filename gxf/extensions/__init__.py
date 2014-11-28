@@ -29,3 +29,4 @@ with gxf.register.prefix("gx"):
     import gxf.extensions.heading
     import gxf.extensions.pae
     import gxf.extensions.context
+    import gxf.extensions.registers

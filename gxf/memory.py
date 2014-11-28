@@ -34,6 +34,10 @@ class RefChain(list, gxf.Formattable):
 
 
             if "x" in m.perms:
+
+                # This is not true. Lots of constant strings are in r-x.
+                # We need to check this. how?
+
                 chain[-1][2] = gxf.disassemble_lines(addr, ignfct=True).lines[0]
                 break
 
@@ -44,8 +48,8 @@ class RefChain(list, gxf.Formattable):
         # We should check if the value of the last element in chain
         # is something we can guess. In particular this is where we
         # should retrieve a larger portion of the string if those
-        # bytes are printable. We smart about heuristics. Peda messes
-        # up from time to time, try to do things better.
+        # bytes are printable. Try to be smart about heuristics.
+        # Peda messes up from time to time, try to do things better.
 
         self.chain = chain
 
@@ -57,31 +61,39 @@ class RefChain(list, gxf.Formattable):
 
         for addr, mmap, val in self[:-1]:
             yield from mmap.fmtaddr(addr)
-            yield (Token.Text, " : ")
+            yield (Token.Comment, " : ")
 
-
-        # For the last element its special, if formatable we
-        # dont want to print the address ? (its probably disass)
+        # The last element is special, we want to check if it can
+        # format itself. We also have some special handling for
+        # known types such as DisasselmblyLines.
         addr, mmap, val = self[-1]
 
-        yield from mmap.fmtaddr(addr)
-        yield (Token.Text, " : ")
-
         if isinstance(val, gxf.DisassemblyLine):
-
-            # TODO: there is a problem with showing disass like this
-            # the lines start with spaces to leave place for the
-            # occasional "=>", what should we do about this?
-
-            yield from val.fmtinsttokens()
+            # We format the address itself the way we do the others
+            # but we let the instruction print the ':' because it
+            # might want to print the function name before it.
+            yield from mmap.fmtaddr(addr)
+            yield (Token.Text, " ")
+            yield from val.fmttokens(offset=val.addressidx+1, skipleading=True)
 
         elif isinstance(val, gxf.Formattable):
+            yield from mmap.fmtaddr(addr)
+            yield (Token.Comment, " : ")
+
             yield from val.fmttokens()
 
         elif isinstance(val, str):
+
+            yield from mmap.fmtaddr(addr)
+            yield (Token.Comment, " : ")
+
             yield (Token.Text, "%s" % val)
 
         else:
+
+            yield from mmap.fmtaddr(addr)
+            yield (Token.Comment, " : ")
+
             yield (Token.Text, "%#x" % int(val))
 
 

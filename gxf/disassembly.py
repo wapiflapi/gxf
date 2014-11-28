@@ -244,6 +244,7 @@ class DisassemblyLine(gxf.Formattable):
     def __init__(self, tokens):
         self.tokens = tokens
         self.address = None
+        self.addressidx = None
         self.inst = None
         self.instidx = None
 
@@ -258,6 +259,7 @@ class DisassemblyLine(gxf.Formattable):
                     self.current = True
                 else:
                     self.address = int(value, 0)
+                    self.addressidx = i
 
             if ttype is Token.Comment.Special:
                 self.bytecode.extend(int(v, 16) for v in value.split())
@@ -284,12 +286,17 @@ class DisassemblyLine(gxf.Formattable):
         else:
             self.itype = None
 
-    def fmttokens(self, hexdump=False, offset=0):
+    def fmttokens(self, hexdump=False, offset=0, skipleading=False):
 
         gstyle = Token.Generic.Heading if self.current else None
         style = self.formatting.get(self.itype)
 
         for ttype, value in self.tokens[offset:]:
+
+            if skipleading and value.isspace():
+                continue
+            skipleading = False
+
             if not hexdump and ttype is Token.Comment.Special:
                 continue
             # If bytecode should be an indicator of the instruction
@@ -305,7 +312,6 @@ class DisassemblyLine(gxf.Formattable):
             yield from self.fmttokens(hexdump=hexdump, offset=self.instidx)
         else:
             yield (Token.Comment, "(bad)")
-
 
     def _convert_intel(self, tokens):
 
