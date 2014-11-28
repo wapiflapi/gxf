@@ -56,7 +56,7 @@ class RefChain(list, gxf.Formattable):
 
         # We only check utf8, do we need more?
 
-        invalid = 8
+        invalid = None
         try:
             sval = bval.decode("utf8")
         except UnicodeDecodeError as e:
@@ -67,8 +67,30 @@ class RefChain(list, gxf.Formattable):
         if nullbyte >= 0:
             sval = sval[:nullbyte]
 
-        if (len(sval) >= 3 and invalid != len(sval)) or len(sval) in (4, 8):
-            return sval
+        if len(sval) == 4 or (3 <= len(sval) < 8 and invalid != len(sval)):
+            return repr(sval)
+        elif len(sval) == 8:
+
+            # Read full string if al 8 bytes are good (and no nullbyte)
+            # this should also reduce false positives with bytecode since
+            # a decoding error *before* a null byte will make us forget
+            # about trying to represent this as a string.
+
+            val = addr.cast(gdb.lookup_type("char").pointer())
+
+            try:
+                sval = val.string(encoding="utf8")
+
+                # TODO: Use something better to shorten strings.
+                # long repetitions should be detected and factorized.
+                sufix = "..." if len(sval) > 128 else ""
+                sval = "%r%s" % (sval[:128], sufix)
+                return sval
+
+            except UnicodeDecodeError:
+                # fallthrough
+                pass
+
 
         if "x" in m.perms:
             # Not a string and executable, this might be disassembly.
@@ -108,7 +130,7 @@ class RefChain(list, gxf.Formattable):
         elif isinstance(val, str):
             yield from mmap.fmtaddr(addr)
             yield (Token.Comment, " : ")
-            yield (Token.Text, "%r" % val)
+            yield (Token.Text, "%s" % val)
 
         else:
             yield from mmap.fmtaddr(addr)
