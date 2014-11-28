@@ -16,4 +16,14 @@ class Heading(gxf.DataCommand):
 
     def run(self, args):
 
-        gxf.disassemble_heading(args.what, count=args.count + args.before, offset=-args.before)
+        trunk, branch, future, stop = gxf.disassemble_heading(
+            args.what, count=args.count + args.before, offset=-args.before)
+
+        trunk.output(stop=branch)
+
+        if future:
+            print("future:")
+            future.output(stop=stop)
+
+            print("alternative:")
+            trunk.output(start=branch)

@@ -744,20 +744,19 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
 
 def disassemble_heading(addr, count=10, offset=0):
 
-    # TODO: Don't print in here. return a blockchain.
-    # no idea what that should look like, but *objects*.
-
-    addr = int(addr)
-
     if offset > 0:
         raise NotImplementedError("heading w/ offset > 0")
 
-    disassembly = disassemble_lines(addr, count, offset, ignfct=True)
+    addr = int(addr)
+
+    trunk = disassemble_lines(addr, count, offset, ignfct=True)
+    branch = None
 
     heading = None
 
-    for i, line in enumerate(disassembly):
-        line.output()
+    future, stop = None, None
+
+    for i, line in enumerate(trunk):
 
         if i < -offset:
             # not interested in headings before current addr.
@@ -765,21 +764,16 @@ def disassemble_heading(addr, count=10, offset=0):
 
         heading = line.get_heading()
         if heading is not None:
+            branch = i + 1
             break
 
-    if heading:
+    # We're not interested if branch is last line.
+    if heading and branch < count:
 
-        print(" > discontinuous:")
-
-        disassembly2 = disassemble_lines(heading, count - i, ignfct=True)
-        for line in disassembly2:
-            line.output()
+        future = disassemble_lines(heading, count - i, ignfct=True)
+        for i, line in enumerate(future):
             if line.itype is RET:
+                stop = i
                 break
 
-        # TODO: only print if still stuff to disass, we dont
-        # want to print this if the branch was the last line
-        print(" # alternative:")
-
-    print(disassembly.format(start=i + 1), end='')
-
+    return trunk, branch, future, stop
