@@ -11,8 +11,9 @@ class Heading(gxf.DataCommand):
 
     def setup(self, parser):
         parser.add_argument("what", type=gxf.LocationType())
+        parser.add_argument("-c", "--count", type=int, default=10)
         parser.add_argument("-b", "--before", type=int, default=0)
 
     def run(self, args):
 
-        gxf.disassemble_heading(args.what, offset=-args.before)
+        gxf.disassemble_heading(args.what, count=args.count + args.before, offset=-args.before)

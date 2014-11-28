@@ -64,21 +64,25 @@ class RefChain(list, gxf.Formattable):
         # dont want to print the address ? (its probably disass)
         addr, mmap, val = self[-1]
 
-        if isinstance(val, gxf.Formattable):
+        yield from mmap.fmtaddr(addr)
+        yield (Token.Text, " : ")
+
+        if isinstance(val, gxf.DisassemblyLine):
 
             # TODO: there is a problem with showing disass like this
             # the lines start with spaces to leave place for the
             # occasional "=>", what should we do about this?
 
-            yield from val.fmttokens()
-        else:
-            yield from mmap.fmtaddr(addr)
-            yield (Token.Text, " : ")
+            yield from val.fmtinsttokens()
 
-            if isinstance(val, str):
-                yield (Token.Text, "%s" % val)
-            else:
-                yield (Token.Text, "%#x" % int(val))
+        elif isinstance(val, gxf.Formattable):
+            yield from val.fmttokens()
+
+        elif isinstance(val, str):
+            yield (Token.Text, "%s" % val)
+
+        else:
+            yield (Token.Text, "%#x" % int(val))
 
 
 

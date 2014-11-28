@@ -36,5 +36,5 @@ class Telescope(gxf.DataCommand):
             offset = addr - int(args.what)
             refchain = memory.refchain(addr)
 
-            print("   %*.d/%-*.d " % (ow, offset, iw, abs(offset//size)), end="")
+            print("%2.d " % (offset, ), end="")
             refchain.output()

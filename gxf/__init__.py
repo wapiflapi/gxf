@@ -19,3 +19,4 @@ if GDB:
     from gxf.errors import *
     from gxf.cpu import *
     from gxf.memory import *
+    from gxf.events import *

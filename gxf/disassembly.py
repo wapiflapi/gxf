@@ -284,12 +284,12 @@ class DisassemblyLine(gxf.Formattable):
         else:
             self.itype = None
 
-    def fmttokens(self, hexdump=False):
+    def fmttokens(self, hexdump=False, offset=0):
 
         gstyle = Token.Generic.Heading if self.current else None
         style = self.formatting.get(self.itype)
 
-        for ttype, value in self.tokens:
+        for ttype, value in self.tokens[offset:]:
             if not hexdump and ttype is Token.Comment.Special:
                 continue
             # If bytecode should be an indicator of the instruction
@@ -299,6 +299,13 @@ class DisassemblyLine(gxf.Formattable):
             if gstyle:
                 ttype = gstyle
             yield ttype, value
+
+    def fmtinsttokens(self, hexdump=False):
+        if self.instidx is not None:
+            yield from self.fmttokens(hexdump=hexdump, offset=self.instidx)
+        else:
+            yield (Token.Comment, "(bad)")
+
 
     def _convert_intel(self, tokens):
 
@@ -760,6 +767,8 @@ def disassemble_heading(addr, count=10, offset=0):
             if line.itype is RET:
                 break
 
+        # TODO: only print if still stuff to disass, we dont
+        # want to print this if the branch was the last line
         print(" # alternative:")
 
     print(disassembly.format(start=i + 1), end='')

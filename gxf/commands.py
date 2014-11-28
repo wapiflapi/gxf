@@ -32,6 +32,7 @@ class LocationType(object):
     argcompleter = GdbCompleter(gdb.COMPLETE_LOCATION)
 
     def __call__(self, arg):
+
         try:
             value = gdb.parse_and_eval(arg)
         except Exception as e:
