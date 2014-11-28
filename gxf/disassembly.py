@@ -345,7 +345,7 @@ class DisassemblyLine(gxf.Formattable):
                     ctokens.append((Token.Punctuation, "("))
                     ctokens.append((t, "$%s" % v))
                     ctokens.append((Token.Operator, "+"))
-                    ctokens.append((Token.Literal.Number, "%d" % instsz))
+                    ctokens.append((Token.Literal.Number, "%d" % len(self.bytecode)))
                     ctokens.append((Token.Punctuation, ")"))
                 else:
                     ctokens.append((t, "$%s" % v))
@@ -418,7 +418,7 @@ class DisassemblyLine(gxf.Formattable):
                         ctokens.append((Token.Punctuation, "("))
                         ctokens.append((t, "%s" % v))
                         ctokens.append((Token.Operator, "+"))
-                        ctokens.append((Token.Literal.Number, "%d" % instsz))
+                        ctokens.append((Token.Literal.Number, "%d" % len(self.bytecode)))
                         ctokens.append((Token.Punctuation, ")"))
                     else:
                         ctokens.append((t, v))
