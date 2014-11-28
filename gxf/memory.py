@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import struct
+
 import gxf
 import gdb
 
@@ -14,53 +16,73 @@ class RefChain(list, gxf.Formattable):
         while True:
 
             if any(x[0] == addr for x in chain):
-                chain[-1][2] = ...
+                val = ...
                 break
 
             try:
                 m = memory.get_map(addr)
+                val = memory.read_ptr(addr)
             except gxf.MemoryError:
-
-                if not chain:
-                    # This means the first address failed.
-                    raise
-
-                chain[-1][2] = addr
                 break
 
-
-            val = memory.read_ptr(addr)
             chain.append([addr, m, val])
-
-
-            if "x" in m.perms:
-
-                # This is not true. Lots of constant strings are in r-x.
-                # We need to check this. how?
-
-                chain[-1][2] = gxf.disassemble_lines(addr, ignfct=True).lines[0]
-                break
-
             addr = val
 
 
-        # TODO:
-        # We should check if the value of the last element in chain
-        # is something we can guess. In particular this is where we
-        # should retrieve a larger portion of the string if those
-        # bytes are printable. Try to be smart about heuristics.
-        # Peda messes up from time to time, try to do things better.
+        if not chain:
+            # This wasn't even a valid pointer. We use the wanabee
+            # address as value. (maybe taken from a register or other)
+            chain.append([None, None, addr])
+
+        # Now we examine the last element of the chain and we
+        # try to find a better representation of its value.
+        chain[-1][2] = self.guesstype(*chain[-1])
 
         self.chain = chain
 
         list.__init__(self, self.chain)
         gxf.Formattable.__init__(self)
 
+    def guesstype(self, addr, m, val):
+
+        # TODO: when memory will know about ELF or other formats
+        # it will be possibile to have more info about code / rodata.
+        # we'll need to take this into account here to.
+
+        # TODO: We should take little/big endian into account
+        # to do this properly.
+
+        bval = struct.pack("q", int(val))
+
+        # We only check utf8, do we need more?
+
+        invalid = 8
+        try:
+            sval = bval.decode("utf8")
+        except UnicodeDecodeError as e:
+            invalid = e.start
+            sval = bval[:invalid].decode("utf8")
+
+        nullbyte = sval.find("\x00")
+        if nullbyte >= 0:
+            sval = sval[:nullbyte]
+
+        if (len(sval) >= 3 and invalid != len(sval)) or len(sval) in (4, 8):
+            return sval
+
+        if "x" in m.perms:
+            # Not a string and executable, this might be disassembly.
+            disline = gxf.disassemble_lines(addr, ignfct=True).lines[0]
+            if disline.inst is not None:
+                return disline
+
+        # Not a string, not disassembly, what else?
+        return val
 
     def fmttokens(self):
 
-        for addr, mmap, val in self[:-1]:
-            yield from mmap.fmtaddr(addr)
+        for addr, m, val in self[:-1]:
+            yield from m.fmtaddr(addr)
             yield (Token.Comment, " : ")
 
         # The last element is special, we want to check if it can
@@ -74,7 +96,8 @@ class RefChain(list, gxf.Formattable):
             # might want to print the function name before it.
             yield from mmap.fmtaddr(addr)
             yield (Token.Text, " ")
-            yield from val.fmttokens(offset=val.addressidx+1, skipleading=True)
+            yield from val.fmttokens(offset=val.addressidx+1,
+                                     skipleading=True, style=None)
 
         elif isinstance(val, gxf.Formattable):
             yield from mmap.fmtaddr(addr)
@@ -83,18 +106,14 @@ class RefChain(list, gxf.Formattable):
             yield from val.fmttokens()
 
         elif isinstance(val, str):
-
             yield from mmap.fmtaddr(addr)
             yield (Token.Comment, " : ")
-
-            yield (Token.Text, "%s" % val)
+            yield (Token.Text, "%r" % val)
 
         else:
-
             yield from mmap.fmtaddr(addr)
             yield (Token.Comment, " : ")
-
-            yield (Token.Text, "%#x" % int(val))
+            yield (Token.Text, ("%d" if abs(val) < 128 else "%#x") % int(val))
 
 
 

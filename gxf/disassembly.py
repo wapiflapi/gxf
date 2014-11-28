@@ -286,10 +286,13 @@ class DisassemblyLine(gxf.Formattable):
         else:
             self.itype = None
 
-    def fmttokens(self, hexdump=False, offset=0, skipleading=False):
+    def fmttokens(self, hexdump=False, offset=0, skipleading=False, style=True):
 
-        gstyle = Token.Generic.Heading if self.current else None
-        style = self.formatting.get(self.itype)
+        if style is True:
+            gstyle = Token.Generic.Heading if self.current else None
+            style = self.formatting.get(self.itype)
+        else:
+            gstyle = style
 
         for ttype, value in self.tokens[offset:]:
 
@@ -299,6 +302,7 @@ class DisassemblyLine(gxf.Formattable):
 
             if not hexdump and ttype is Token.Comment.Special:
                 continue
+
             # If bytecode should be an indicator of the instruction
             # type we should add Comment.Special in the following:
             if style and ttype in (Token.Comment, ):
