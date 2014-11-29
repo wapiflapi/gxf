@@ -23,7 +23,4 @@ class Registers(gxf.DataCommand):
 
             print("%-4s: " % reg, end="")
 
-            try:
-                memory.refchain(val).output()
-            except:
-                print("%#x" % val)
+            memory.refchain(val).output()

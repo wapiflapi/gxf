@@ -8,6 +8,64 @@ import gdb
 from pygments.token import Token
 
 
+# TODO: move this someplace else, utils?
+def repr_long_str(s, maxl=None, maxc=6):
+
+    rep = []
+    total = 0
+    accu = 0
+
+    def add_accu(until):
+
+        if accu >= until:
+            return
+
+        # +3 because it takes 3 to add ... anyway.
+        if maxl is not None and until > accu+maxl-total+3:
+            limit = accu+maxl-total
+        else:
+            limit = until
+
+        rep.append("%r" % s[accu:limit])
+
+        if limit < until:
+            rep.append("...")
+
+        return total + limit-accu
+
+    count, last = 0, None
+    for i, c in enumerate(s):
+        if c == last:
+            count += 1
+
+            # If this is the last char we force the fallthrough.
+            if i < len(s) - 1:
+                continue
+            i += 1
+
+        # we are done with everything before this character
+        # If this is a repetition we add it to reps,
+        # otherwise just let it be added to the accu.
+
+        if count > maxc:
+
+            total = add_accu(i - count)
+
+            if maxl is not None and total >= maxl:
+                accu = len(s)
+                break
+
+            rep.append("%r*%d" % (s[i-count], count))
+            total += 3
+            accu = i
+
+        last = c
+        count = 1
+
+    total = add_accu(len(s))
+    return "+".join(rep)
+
+
 class RefChain(list, gxf.Formattable):
     def __init__(self, memory, addr):
 
@@ -36,14 +94,14 @@ class RefChain(list, gxf.Formattable):
 
         # Now we examine the last element of the chain and we
         # try to find a better representation of its value.
-        chain[-1][2] = self.guesstype(*chain[-1])
+        chain[-1][2] = self.guesstype(memory, *chain[-1])
 
         self.chain = chain
 
         list.__init__(self, self.chain)
         gxf.Formattable.__init__(self)
 
-    def guesstype(self, addr, m, val):
+    def guesstype(self, memory, addr, m, val):
 
         # TODO: when memory will know about ELF or other formats
         # it will be possibile to have more info about code / rodata.
@@ -52,7 +110,7 @@ class RefChain(list, gxf.Formattable):
         # TODO: We should take little/big endian into account
         # to do this properly.
 
-        bval = struct.pack("q", int(val))
+        bval = struct.pack("q" if int(val) < 0 else "Q", int(val))
 
         # We only check utf8, do we need more?
 
@@ -71,28 +129,26 @@ class RefChain(list, gxf.Formattable):
             return repr(sval)
         elif len(sval) == 8:
 
+            if m is None or addr is None:
+                # This didnt come from an address.
+                # We can't read the full string.
+                return repr(sval)
+
             # Read full string if al 8 bytes are good (and no nullbyte)
             # this should also reduce false positives with bytecode since
             # a decoding error *before* a null byte will make us forget
             # about trying to represent this as a string.
 
-            val = addr.cast(gdb.lookup_type("char").pointer())
-
             try:
-                sval = val.string(encoding="utf8")
-
-                # TODO: Use something better to shorten strings.
-                # long repetitions should be detected and factorized.
-                sufix = "..." if len(sval) > 128 else ""
-                sval = "%r%s" % (sval[:128], sufix)
-                return sval
+                sval = memory.read_str(addr, encoding="utf8")
+                return repr_long_str(sval, 128)
 
             except UnicodeDecodeError:
                 # fallthrough
                 pass
 
 
-        if "x" in m.perms:
+        if m is not None and "x" in m.perms:
             # Not a string and executable, this might be disassembly.
             disline = gxf.disassemble_lines(addr, ignfct=True).lines[0]
             if disline.inst is not None:
@@ -121,21 +177,17 @@ class RefChain(list, gxf.Formattable):
             yield from val.fmttokens(offset=val.addressidx+1,
                                      skipleading=True, style=None)
 
-        elif isinstance(val, gxf.Formattable):
-            yield from mmap.fmtaddr(addr)
-            yield (Token.Comment, " : ")
-
-            yield from val.fmttokens()
-
-        elif isinstance(val, str):
-            yield from mmap.fmtaddr(addr)
-            yield (Token.Comment, " : ")
-            yield (Token.Text, "%s" % val)
-
         else:
-            yield from mmap.fmtaddr(addr)
-            yield (Token.Comment, " : ")
-            yield (Token.Text, ("%d" if abs(val) < 128 else "%#x") % int(val))
+            if mmap is not None and addr is not None:
+                yield from mmap.fmtaddr(addr)
+                yield (Token.Comment, " : ")
+
+            if isinstance(val, gxf.Formattable):
+                yield from val.fmttokens()
+            elif isinstance(val, str):
+                yield (Token.Text, "%s" % val)
+            else:
+                yield (Token.Text, ("%d" if abs(val) < 128 else "%#x") % int(val))
 
 
 
@@ -187,6 +239,11 @@ class Memory(gxf.Formattable):
         # or implement something else in gxf.
         mapf = open("/proc/%d/maps" % self.inf.pid)
 
+        # TODO: implement fallback using `maintenance info sections`
+        # TODO: implement fallback using a virtual MMap that maps everything.
+        #       let it fail when we try to read from it later on.
+        #       Make sure this idea works before relying on it.
+
         for line in mapf:
             startend, perms, _ = line.split(None, 2)
             _, backing = line.rsplit(None, 1)
@@ -197,6 +254,10 @@ class Memory(gxf.Formattable):
     def read_ptr(self, addr):
         # TODO: maybe use read_memory stuff ?
         return gxf.parse_and_eval("*(void **)%#x" % addr)
+
+    def read_str(self, addr, *args, **kwargs):
+        ptr = gxf.parse_and_eval("(char *)%#x" % addr)
+        return ptr.string(*args, **kwargs)
 
     def get_map(self, addr):
         for m in self.maps:

@@ -288,6 +288,11 @@ class DisassemblyLine(gxf.Formattable):
 
     def fmttokens(self, hexdump=False, offset=0, skipleading=False, style=True):
 
+        # TODO: We need a way to remove indentation.
+        # Something like skip spaces if more than one should do
+        # the trick. It might be worth checking if this is doable
+        # at the Formatable level ?
+
         if style is True:
             gstyle = Token.Generic.Heading if self.current else None
             style = self.formatting.get(self.itype)
