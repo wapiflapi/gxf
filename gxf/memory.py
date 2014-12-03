@@ -18,7 +18,7 @@ def repr_long_str(s, maxl=None, maxc=6):
     def add_accu(until):
 
         if accu >= until:
-            return
+            return total
 
         # +3 because it takes 3 to add ... anyway.
         if maxl is not None and until > accu+maxl-total+3:
@@ -110,6 +110,12 @@ class RefChain(list, gxf.Formattable):
         # TODO: We should take little/big endian into account
         # to do this properly.
 
+        if 0x20 < val < 0x7e:
+            return gxf.Formattable(((Token.Numeric.Integer, str(val)),
+                                    (Token.Comment, " %r" % chr(val))))
+        elif val < 256:
+            return gxf.Formattable(((Token.Numeric.Integer, str(val)),))
+
         bval = struct.pack("q" if int(val) < 0 else "Q", int(val))
 
         # We only check utf8, do we need more?
@@ -122,17 +128,15 @@ class RefChain(list, gxf.Formattable):
             sval = bval[:invalid].decode("utf8")
 
         nullbyte = sval.find("\x00")
-        if nullbyte >= 0:
-            sval = sval[:nullbyte]
+        wval = sval[:nullbyte] if nullbyte >= 0 else sval
 
-        if len(sval) == 4 or (3 <= len(sval) < 8 and invalid != len(sval)):
-            return repr(sval)
-        elif len(sval) == 8:
+        if len(wval) == 8 or len(wval) == 4:
+            # 4 bytes might be ok if this is 32 bit.
 
             if m is None or addr is None:
                 # This didnt come from an address.
                 # We can't read the full string.
-                return repr(sval)
+                return repr(wval)
 
             # Read full string if al 8 bytes are good (and no nullbyte)
             # this should also reduce false positives with bytecode since
@@ -140,13 +144,18 @@ class RefChain(list, gxf.Formattable):
             # about trying to represent this as a string.
 
             try:
-                sval = memory.read_str(addr, encoding="utf8")
-                return repr_long_str(sval, 128)
+                wval = memory.read_str(addr, encoding="utf8")
+                return repr_long_str(wval, 128)
 
             except UnicodeDecodeError:
                 # fallthrough
                 pass
-
+        elif 3 <= len(wval) < 8 and invalid != len(wval):
+            return repr(wval)
+        elif 2 <= len(wval) < 8 and invalid is None:
+            # We might not have had more than three characters but this
+            # might still be somewhere where a lot of printable data is.
+            return repr(wval)
 
         if m is not None and "x" in m.perms:
             # Not a string and executable, this might be disassembly.

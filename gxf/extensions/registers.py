@@ -3,6 +3,8 @@
 import gxf
 import gdb
 
+from gxf.formatting import Token, Formattable
+
 @gxf.register()
 class Registers(gxf.DataCommand):
     '''
@@ -21,6 +23,14 @@ class Registers(gxf.DataCommand):
             if reg == "eflags" or (len(reg) == 2 and reg[1] == "s"):
                 continue
 
-            print("%-4s: " % reg, end="")
+            if reg in ("rdi", "rsi", "rdx", "rcx", "r8", "r9"):
+                ttype = Token.Text
+            elif reg in ("rip", "rbp", "rsp"):
+                ttype = Token.Generic.Heading
+            else:
+                ttype = Token.Comment
+
+            print(Formattable(((ttype, "%-4s" % reg), (Token.Comment, ": "))), end="")
+            #%s " % (reg, "-" if reg in  else ":"), end="")
 
             memory.refchain(val).output()
