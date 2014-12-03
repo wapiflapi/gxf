@@ -690,6 +690,10 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
                         nextguess = crossing
 
 
+            if validmem == backguess:
+                # Still nothing valid. abort.
+                raise gxf.MemoryError(backguess)
+
             # Ok new limits after BS, we need to start this over:
             backguess = validmem
             guesslimit = backguess + 16

@@ -78,7 +78,7 @@ class RefChain(list, gxf.Formattable):
                 break
 
             try:
-                m = memory.get_map(addr)
+                m = memory.get_section_or_map(addr)
                 val = memory.read_ptr(addr)
             except gxf.MemoryError:
                 break
@@ -103,10 +103,6 @@ class RefChain(list, gxf.Formattable):
 
     def guesstype(self, memory, addr, m, val):
 
-        # TODO: when memory will know about ELF or other formats
-        # it will be possibile to have more info about code / rodata.
-        # we'll need to take this into account here to.
-
         # TODO: We should take little/big endian into account
         # to do this properly.
 
@@ -117,6 +113,7 @@ class RefChain(list, gxf.Formattable):
             return gxf.Formattable(((Token.Numeric.Integer, str(val)),))
 
         bval = struct.pack("q" if int(val) < 0 else "Q", int(val))
+        aval = struct.unpack("Q", bval)[0]
 
         # We only check utf8, do we need more?
 
@@ -164,7 +161,7 @@ class RefChain(list, gxf.Formattable):
                 return disline
 
         # Not a string, not disassembly, what else?
-        return val
+        return aval
 
     def fmttokens(self):
 
@@ -203,19 +200,32 @@ class RefChain(list, gxf.Formattable):
 
 class MMap(gxf.Formattable):
 
-    def __init__(self, start, end, perms, backing=None):
+    def __init__(self, start, end, perms, backing=None, comment=None):
         if not backing:
             backing = None
         self.start = start
         self.end = end
         self.perms = perms
         self.backing = backing
+        self.comment = None
 
     def __contains__(self, addr):
         return self.start <= addr < self.end
 
     def fmttokens(self):
-        yield (Token.Text, "%#x-%#x %s %s\n" % (self.start, self.end, self.perms, self.backing))
+
+        ttype = Token.Comment
+        if "r" in self.perms:
+            ttype = Token.Text
+        if "w" in self.perms:
+            ttype = Token.Generic.Heading
+        if "x" in self.perms:
+            ttype = Token.Generic.Subheading
+        if "w" in self.perms and "x" in self.perms:
+            ttype = Token.Generic.Deleted
+
+        yield (ttype, "%#x-%#x %s %s %s\n" % (self.start, self.end, self.perms,
+                                                   self.backing, self.comment or ""))
 
     def fmtaddr(self, addr):
 
@@ -230,6 +240,16 @@ class MMap(gxf.Formattable):
 
         yield (token, "%#.x" % addr)
 
+class Section(MMap):
+
+    def __init__(self, start, end, name, tags):
+        self.tags = tags
+
+        perms = "%s%s%sp" % ("r",
+                             "w" if not "READONLY" in tags else "-",
+                             "x" if "CODE" in tags else "-")
+
+        super().__init__(start, end, perms, name, comment=" ".join(self.tags))
 
 class Memory(gxf.Formattable):
 
@@ -240,25 +260,50 @@ class Memory(gxf.Formattable):
         if not self.inf.threads():
             raise ValueError("inferior is not running")
 
-        self.maps = []
+        self.maps = self._read_maps()
+        self.sections = self._read_sections()
 
-        # Ok if this fails:
-        # either the process isn't running or you don't have access to its /proc/
-        # if /proc/ isnt available please just `mount -t procfs proc /proc`
-        # or implement something else in gxf.
-        mapf = open("/proc/%d/maps" % self.inf.pid)
-
-        # TODO: implement fallback using `maintenance info sections`
         # TODO: implement fallback using a virtual MMap that maps everything.
         #       let it fail when we try to read from it later on.
         #       Make sure this idea works before relying on it.
 
+    def _read_maps(self):
+
+        # Ok if this fails:
+        # either the process isn't running or you don't have access to its /proc/
+        # if /proc/ isnt available please just `mount -t procfs proc /proc`
+
+        try:
+            mapf = open("/proc/%d/maps" % self.inf.pid)
+        except IOError:
+            return []
+
+        maps = []
+
         for line in mapf:
             startend, perms, _ = line.split(None, 2)
             _, backing = line.rsplit(None, 1)
-
             start, end = (int(x, 16) for x in startend.split("-"))
-            self.maps.append(MMap(start, end, perms, backing))
+            maps.append(MMap(start, end, perms, backing))
+
+        return maps
+
+    def _read_sections(self):
+        data = gxf.execute("maintenance info sections")
+
+        sections = []
+
+        for line in data.splitlines()[2:]:
+            try:
+                _, startend, _, _, name, tags = line.split(None, 5)
+                start, end = (int(x, 16) for x in startend.split("->"))
+            except:
+                continue
+            tags = tags.split()
+            if "LOAD" in tags:
+                sections.append(Section(start, end, name, tags))
+
+        return sections
 
     def read_ptr(self, addr):
         # TODO: maybe use read_memory stuff ?
@@ -268,15 +313,30 @@ class Memory(gxf.Formattable):
         ptr = gxf.parse_and_eval("(char *)%#x" % addr)
         return ptr.string(*args, **kwargs)
 
+    def get_section_or_map(self, addr):
+        for s in self.sections:
+            if addr in s: return s
+        for m in self.maps:
+            if addr in m: return m
+        raise gxf.MemoryError(addr)
+
     def get_map(self, addr):
         for m in self.maps:
-            if addr in m:
-                return m
+            if addr in m: return m
+        for s in self.sections:
+            if addr in s: return s
         raise gxf.MemoryError(addr)
 
     def refchain(self, addr):
         return RefChain(self, addr)
 
-    def fmttokens(self):
+    def fmttokens(self, address=None):
+        for section in self.sections:
+            if address is None or address in section:
+                yield from section.fmttokens()
         for mmap in self.maps:
-            yield from mmap.fmttokens()
+            if address is None or address in mmap:
+                yield from mmap.fmttokens()
+
+    def output(self, *args, **kwargs):
+        print(self.format(*args, **kwargs), end="")

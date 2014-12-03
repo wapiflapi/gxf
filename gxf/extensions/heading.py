@@ -16,8 +16,16 @@ class Heading(gxf.DataCommand):
 
     def run(self, args):
 
-        trunk, branch, future, stop = gxf.disassemble_heading(
-            args.what, count=args.count + args.before, offset=-args.before)
+        try:
+            trunk, branch, future, stop = gxf.disassemble_heading(
+                args.what, count=args.count + args.before, offset=-args.before)
+        except gxf.MemoryError as e:
+            if e.address == args.what:
+                print("Invalid address %#x." % e.address)
+                return
+            else:
+                # This is probably a bug :S
+                raise
 
         trunk.output(stop=branch)
 

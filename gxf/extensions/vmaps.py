@@ -10,10 +10,10 @@ class Vmaps(gxf.DataCommand):
     '''
 
     def setup(self, parser):
-        pass
+        parser.add_argument("what", type=gxf.LocationType(), nargs="?")
 
     def run(self, args):
 
         memory = gxf.Memory()
 
-        memory.output()
+        memory.output(args.what)
