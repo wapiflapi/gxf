@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import abc
-
 import pygments
 from pygments.formatters import TerminalFormatter
-from pygments.token import Token
+from pygments.token import Token  # NOQA
 
 formatter = TerminalFormatter(bg="dark")
+
 
 class Formattable(object):
 

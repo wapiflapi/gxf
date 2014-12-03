@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import math
-
 import gxf
-import gdb
+
 
 @gxf.register()
 class Telescope(gxf.DataCommand):
@@ -23,12 +21,6 @@ class Telescope(gxf.DataCommand):
         size = int(args.size or gxf.cpu.get_addrsz())
         start = int(args.what - args.before * size)
         end = int(args.until or args.what + args.count * size)
-
-        m = max(abs(start - int(args.what)), abs(end - int(args.what) - 1))
-
-        ow = math.floor(math.log(m, 10)) + 1
-        iw = math.floor(math.log(m / size, 10)) + 1
-        aw = math.floor(math.log(end, 10)) + 1
 
         memory = gxf.Memory()
 

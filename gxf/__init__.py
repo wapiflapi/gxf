@@ -5,7 +5,7 @@ __email__ = 'wapiflapi@yahoo.fr'
 __version__ = '0.1.0'
 
 try:
-    import gdb
+    import gdb  # NOQA
 except ImportError:
     GDB = False
 else:

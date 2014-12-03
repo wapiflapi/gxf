@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import gxf
-import gdb
 
 from gxf.formatting import Token, Formattable
+
 
 @gxf.register()
 class Registers(gxf.DataCommand):
@@ -30,7 +30,7 @@ class Registers(gxf.DataCommand):
             else:
                 ttype = Token.Comment
 
-            print(Formattable(((ttype, "%-4s" % reg), (Token.Comment, ": "))), end="")
-            #%s " % (reg, "-" if reg in  else ":"), end="")
-
-            memory.refchain(val).output()
+            print("%s%s" % (
+                    Formattable(((ttype, "%-4s" % reg),
+                                 (Token.Comment, ": "))),
+                    memory.refchain(val)))

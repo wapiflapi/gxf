@@ -18,15 +18,15 @@ class Gx(gxf.Command):
 # Extensions loaded when import gx:
 
 with gxf.register.prefix("gx"):
-    import gxf.extensions.reload
-    import gxf.extensions.meta
-    import gxf.extensions.testi
+    import gxf.extensions.reload        # NOQA
+    import gxf.extensions.meta          # NOQA
+    import gxf.extensions.testi         # NOQA
 
-    import gxf.extensions.telescope
-    import gxf.extensions.addr
-    import gxf.extensions.vmaps
-    import gxf.extensions.disassemble
-    import gxf.extensions.heading
-    import gxf.extensions.pae
-    import gxf.extensions.context
-    import gxf.extensions.registers
+    import gxf.extensions.telescope     # NOQA
+    import gxf.extensions.addr          # NOQA
+    import gxf.extensions.vmaps         # NOQA
+    import gxf.extensions.disassemble   # NOQA
+    import gxf.extensions.heading       # NOQA
+    import gxf.extensions.pae           # NOQA
+    import gxf.extensions.context       # NOQA
+    import gxf.extensions.registers     # NOQA

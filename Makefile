@@ -32,7 +32,7 @@ clean-test:
 	rm -fr htmlcov/
 
 lint:
-	python3 -m flake8 gxf tests
+	python3 `which flake8` gxf tests
 
 test:
 	python3 setup.py test

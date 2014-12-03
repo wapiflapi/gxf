@@ -5,6 +5,7 @@ import gxf
 
 debug = False
 
+
 def execute(cmd, tty=False, tostr=True):
 
     if debug:

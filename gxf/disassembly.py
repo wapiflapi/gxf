@@ -2,12 +2,10 @@
 
 import pygments
 from pygments.lexers import NasmLexer, GasLexer
-from pygments.lexers import CppObjdumpLexer, NasmObjdumpLexer
 from pygments.filter import Filter
-from pygments.lexer import DelegatingLexer, RegexLexer, inherit, bygroups
+from pygments.lexer import DelegatingLexer, RegexLexer, bygroups
 from pygments.token import Token
 
-import re
 import gdb
 import gxf
 
@@ -72,18 +70,19 @@ class GdbContextLexer(RegexLexer):
 
     tokens = {
         'root': [
-            ('[ \t]+', Token.Text),
+            (r'[ \t]+', Token.Text),
             (r'=>', Token.Comment),
             (r'0x[0-9a-f]+', Token.Comment, 'gx_location'),
             (r'[0-9a-f]{2}[ \t]', Token.Comment.Special),
-            ('\(bad\)', Token.Comment),
-            ('(.*?)(#.*)?(\n)', bygroups(
+            (r'\(bad\)', Token.Comment),
+            (r'(.*?)(#.*)?(\n)', bygroups(
                     Token.Other, Token.Comment, Token.Other)),
             ],
-        'gx_location': [
-            ('[ \t]+', Token.Text),
-            (':', Token.Comment, '#pop'),
-            ('(<)(.*)(\+)([0-9]+)(>)(:)', bygroups(
+        'gx_location':
+            [
+            (r'[ \t]+', Token.Text),
+            (r':', Token.Comment, '#pop'),
+            (r'(<)(.*)(\+)([0-9]+)(>)(:)', bygroups(
                     Token.Operator, Token.Name.Variable, Token.Operator,
                     Token.Literal.Number.Integer,
                     Token.Operator, Token.Comment), '#pop'),
@@ -252,7 +251,6 @@ class DisassemblyLine(gxf.Formattable):
 
         self.current = False
 
-        next_is_function = False
         for i, (ttype, value) in enumerate(tokens):
             if ttype is Token.Comment and self.address is None:
                 if value == "=>":
@@ -270,6 +268,7 @@ class DisassemblyLine(gxf.Formattable):
                 self.instidx = i
 
         self.bytecode = bytes(self.bytecode)
+        self.length = len(self.bytecode)
 
         if self.inst is None:
             self.itype = None
@@ -286,7 +285,8 @@ class DisassemblyLine(gxf.Formattable):
         else:
             self.itype = None
 
-    def fmttokens(self, hexdump=False, offset=0, skipleading=False, style=True):
+    def fmttokens(self, hexdump=False, offset=0,
+                  skipleading=False, style=True):
 
         # TODO: We need a way to remove indentation.
         # Something like skip spaces if more than one should do
@@ -350,7 +350,7 @@ class DisassemblyLine(gxf.Formattable):
                     ctokens.append((Token.Punctuation, "("))
                     ctokens.append((t, "$%s" % v))
                     ctokens.append((Token.Operator, "+"))
-                    ctokens.append((Token.Literal.Number, "%d" % len(self.bytecode)))
+                    ctokens.append((Token.Literal.Number, "%d" % self.length))
                     ctokens.append((Token.Punctuation, ")"))
                 else:
                     ctokens.append((t, "$%s" % v))
@@ -376,16 +376,18 @@ class DisassemblyLine(gxf.Formattable):
                 base = ctokens
                 ctokens = []
 
-                ctokens.append((Token.Operator, "*"))
-                ctokens.append((Token.Punctuation, "("))
+                ctokens.extend(
+                    (Token.Operator, "*"),
+                    (Token.Punctuation, "("),
 
-                # should convert types to cast here.
-                ctokens.append((Token.Keyword.Type, "void"))
-                ctokens.append((Token.Operator, "*"))
+                    # should convert types to cast here.
+                    (Token.Keyword.Type, "void"),
+                    (Token.Operator, "*"),
 
-                ctokens.append((Token.Operator, "*"))
-                ctokens.append((Token.Punctuation, ")"))
-                ctokens.append((Token.Punctuation, "("))
+                    (Token.Operator, "*"),
+                    (Token.Punctuation, ")"),
+                    (Token.Punctuation, "("),
+                    )
 
                 ctokens.extend(base)
 
@@ -420,11 +422,13 @@ class DisassemblyLine(gxf.Formattable):
                         ctokens.append((Token.Literal.Number, "0"))
 
                     elif v in ("$eip", "$rip", "$pc"):
-                        ctokens.append((Token.Punctuation, "("))
-                        ctokens.append((t, "%s" % v))
-                        ctokens.append((Token.Operator, "+"))
-                        ctokens.append((Token.Literal.Number, "%d" % len(self.bytecode)))
-                        ctokens.append((Token.Punctuation, ")"))
+                        ctokens.extend(
+                            (Token.Punctuation, "("),
+                            (t, "%s" % v),
+                            (Token.Operator, "+"),
+                            (Token.Literal.Number, "%d" % self.length),
+                            (Token.Punctuation, ")"),
+                            )
                     else:
                         ctokens.append((t, v))
 
@@ -632,7 +636,6 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
     # The following pattern has false positives, its not a problem.
     hexaddr = "%x" % addr
 
-    badblocks = []
     baddr, bdata, bmsg = None, None, None
     check = False
 
@@ -642,7 +645,7 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
         try:
             data, msg = _disassemble(backguess, addr + count * 16,
                                      ignmemerr=False)
-        except gxf.MemoryError as e:
+        except gxf.MemoryError:
             # Shit, we're on the edge. We don't know how far, both directions
             # might take a realy long time without a way to know if we will
             # endup hitting something.
@@ -667,7 +670,7 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
 
                 try:
                     _disassemble(nextguess, addr + count * 16, ignmemerr=False)
-                except gxf.MemoryError as e:
+                except gxf.MemoryError:
                     backguess = nextguess
                 else:
                     validmem = nextguess
@@ -689,7 +692,6 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
                     if backguess < crossing < validmem:
                         nextguess = crossing
 
-
             if validmem == backguess:
                 # Still nothing valid. abort.
                 raise gxf.MemoryError(backguess)
@@ -698,7 +700,6 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
             backguess = validmem
             guesslimit = backguess + 16
             continue
-
 
         if hexaddr in data:
             check = _check_data(data, addr)
@@ -732,7 +733,7 @@ def disassemble_lines(addr, count=1, offset=0, ignfct=False):
             try:
                 bdata, bmsg = _disassemble(backguess, backguess + count * 16,
                                            ignmemerr=False)
-            except gxf.MemoryError as e:
+            except gxf.MemoryError:
                 break
 
             if hexaddr in bdata and _check_data(bdata, addr) is not None:

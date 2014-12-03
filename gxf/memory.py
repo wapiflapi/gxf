@@ -3,7 +3,6 @@
 import struct
 
 import gxf
-import gdb
 
 from pygments.token import Token
 
@@ -20,9 +19,9 @@ def repr_long_str(s, maxl=None, maxc=6):
         if accu >= until:
             return total
 
-        # +3 because it takes 3 to add ... anyway.
-        if maxl is not None and until > accu+maxl-total+3:
-            limit = accu+maxl-total
+        # +3 because it takes 3 to add '...' anyway.
+        if maxl is not None and until > accu + maxl - total + 3:
+            limit = accu + maxl - total
         else:
             limit = until
 
@@ -31,7 +30,7 @@ def repr_long_str(s, maxl=None, maxc=6):
         if limit < until:
             rep.append("...")
 
-        return total + limit-accu
+        return total + limit - accu
 
     count, last = 0, None
     for i, c in enumerate(s):
@@ -55,7 +54,7 @@ def repr_long_str(s, maxl=None, maxc=6):
                 accu = len(s)
                 break
 
-            rep.append("%r*%d" % (s[i-count], count))
+            rep.append("%r*%d" % (s[i - count], count))
             total += 3
             accu = i
 
@@ -86,7 +85,6 @@ class RefChain(list, gxf.Formattable):
             chain.append([addr, m, val])
             addr = val
 
-
         if not chain:
             # This wasn't even a valid pointer. We use the wanabee
             # address as value. (maybe taken from a register or other)
@@ -106,11 +104,8 @@ class RefChain(list, gxf.Formattable):
         # TODO: We should take little/big endian into account
         # to do this properly.
 
-        if 0x20 < val < 0x7e:
-            return gxf.Formattable(((Token.Numeric.Integer, str(val)),
-                                    (Token.Comment, " %r" % chr(val))))
-        elif val < 256:
-            return gxf.Formattable(((Token.Numeric.Integer, str(val)),))
+        if val < 256:
+            return val
 
         bval = struct.pack("q" if int(val) < 0 else "Q", int(val))
         aval = struct.unpack("Q", bval)[0]
@@ -180,7 +175,7 @@ class RefChain(list, gxf.Formattable):
             # might want to print the function name before it.
             yield from mmap.fmtaddr(addr)
             yield (Token.Text, " ")
-            yield from val.fmttokens(offset=val.addressidx+1,
+            yield from val.fmttokens(offset=val.addressidx + 1,
                                      skipleading=True, style=None)
 
         else:
@@ -192,10 +187,13 @@ class RefChain(list, gxf.Formattable):
                 yield from val.fmttokens()
             elif isinstance(val, str):
                 yield (Token.Text, "%s" % val)
+            elif 0x20 < val < 0x7e:
+                yield (Token.Numeric.Integer, str(val))
+                yield (Token.Comment, " %r" % chr(val))
+            elif val < 256:
+                yield (Token.Numeric.Integer, str(val))
             else:
-                yield (Token.Text, ("%d" if abs(val) < 128 else "%#x") % int(val))
-
-
+                yield (Token.Numeric.Integer, "%#x")
 
 
 class MMap(gxf.Formattable):
@@ -224,8 +222,9 @@ class MMap(gxf.Formattable):
         if "w" in self.perms and "x" in self.perms:
             ttype = Token.Generic.Deleted
 
-        yield (ttype, "%#x-%#x %s %s %s\n" % (self.start, self.end, self.perms,
-                                                   self.backing, self.comment or ""))
+        yield (ttype, "%#x-%#x %s %s %s\n" % (
+                self.start, self.end, self.perms,
+                self.backing, self.comment or ""))
 
     def fmtaddr(self, addr):
 
@@ -240,6 +239,7 @@ class MMap(gxf.Formattable):
 
         yield (token, "%#.x" % addr)
 
+
 class Section(MMap):
 
     def __init__(self, start, end, name, tags):
@@ -250,6 +250,7 @@ class Section(MMap):
                              "x" if "CODE" in tags else "-")
 
         super().__init__(start, end, perms, name, comment=" ".join(self.tags))
+
 
 class Memory(gxf.Formattable):
 
@@ -269,9 +270,9 @@ class Memory(gxf.Formattable):
 
     def _read_maps(self):
 
-        # Ok if this fails:
-        # either the process isn't running or you don't have access to its /proc/
-        # if /proc/ isnt available please just `mount -t procfs proc /proc`
+        # Ok if this fails, either the process isn't running or you don't
+        # have access to its /proc/ if /proc/ isnt available please just
+        # `mount -t procfs proc /proc`
 
         try:
             mapf = open("/proc/%d/maps" % self.inf.pid)
@@ -315,16 +316,20 @@ class Memory(gxf.Formattable):
 
     def get_section_or_map(self, addr):
         for s in self.sections:
-            if addr in s: return s
+            if addr in s:
+                return s
         for m in self.maps:
-            if addr in m: return m
+            if addr in m:
+                return m
         raise gxf.MemoryError(addr)
 
     def get_map(self, addr):
         for m in self.maps:
-            if addr in m: return m
+            if addr in m:
+                return m
         for s in self.sections:
-            if addr in s: return s
+            if addr in s:
+                return s
         raise gxf.MemoryError(addr)
 
     def refchain(self, addr):

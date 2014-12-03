@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import gxf
-import gdb
+
 
 @gxf.register()
 class Context(gxf.DataCommand):
@@ -35,5 +35,3 @@ class Context(gxf.DataCommand):
         if args.stack:
             section("stack")
             gxf.execute("gx telescope $sp -c8", True, False)
-
-

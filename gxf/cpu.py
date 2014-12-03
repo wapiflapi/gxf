@@ -3,8 +3,10 @@
 import collections
 import gxf
 
+
 def get_addrsz():
     return int(gxf.parse_and_eval("sizeof (void *)"))
+
 
 class Registers(object):
 

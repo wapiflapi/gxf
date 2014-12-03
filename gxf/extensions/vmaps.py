@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import gxf
-import gdb
+
 
 @gxf.register()
 class Vmaps(gxf.DataCommand):

@@ -85,7 +85,7 @@ class Handler(object):
                 return self.bail(*args, **kwargs)
             else:
                 return self.handle(*args, **kwargs)
-        except BaseException as e:
+        except BaseException:
             print("%s" % (traceback.format_exc(),), end="")
 
     def bail(self, *args, **kwargs):
