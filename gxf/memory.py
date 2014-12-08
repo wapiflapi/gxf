@@ -142,11 +142,15 @@ class RefChain(list, gxf.Formattable):
 
             try:
                 wval = memory.read_str(addr, encoding="utf8")
+            except UnicodeDecodeError as e:
+                # We make an exception and allow unicode errors that occur
+                # after 16 bytes, this is because when exploiting our buffer
+                # might not be null terminated and continue with stack-values.
+                wval = None if e.start < 16 else e.object[:e.start].decode("utf8")
+
+            if wval is not None:
                 return repr_long_str(wval, 50)
 
-            except UnicodeDecodeError:
-                # fallthrough
-                pass
         elif 3 <= len(wval) < 8 and invalid != len(wval):
             return repr(wval)
         elif 2 <= len(wval) < 8 and invalid is None:

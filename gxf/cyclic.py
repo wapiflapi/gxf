@@ -37,6 +37,13 @@ class DeBruijn(object):
         while True:
             yield from self
 
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            start, stop, step = index.start, index.stop, index.step
+        else:
+            start, stop, step = index, index + 1, 1
+        return itertools.islice(self.cycle(), start, stop, step)
+
     def offsets(self, x):
 
         x = list(x)
@@ -44,9 +51,11 @@ class DeBruijn(object):
         if any(c not in self.a for c in x):
             raise ValueError("subsequence elements not a subset of alphabet")
 
+        start = []
         window = []
 
-        for i, c in enumerate(self):
+        # We also want to check the overlap.
+        for i, c in enumerate(self[:self.k**self.n+len(x)]):
             if len(window) >= len(x):
                 del window[0]
             window.append(c)
@@ -55,11 +64,3 @@ class DeBruijn(object):
                 if len(x) >= self.n:
                     # We won't find anything else.
                     break
-
-    def __getitem__(self, index):
-        if isinstance(index, slice):
-            start, stop, step = index.start, index.stop, index.step
-        else:
-            start, stop, step = index, index + 1, 1
-        return list(itertools.islice(self.cycle(), start, stop, step))
-
