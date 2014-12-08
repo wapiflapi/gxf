@@ -8,7 +8,7 @@ import string
 dfltalphabet = string.ascii_lowercase
 dfltlength = 4
 
-class debruijn(object):
+class DeBruijn(object):
 
     def __init__(self, a=dfltalphabet, n=dfltlength):
         self.k = len(a)
@@ -40,6 +40,10 @@ class debruijn(object):
     def offsets(self, x):
 
         x = list(x)
+
+        if any(c not in self.a for c in x):
+            raise ValueError("subsequence elements not a subset of alphabet")
+
         window = []
 
         for i, c in enumerate(self):
@@ -48,6 +52,9 @@ class debruijn(object):
             window.append(c)
             if window == x:
                 yield i - len(window) + 1
+                if len(x) >= self.n:
+                    # We won't find anything else.
+                    break
 
     def __getitem__(self, index):
         if isinstance(index, slice):

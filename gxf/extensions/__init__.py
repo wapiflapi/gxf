@@ -30,3 +30,4 @@ with gxf.register.prefix("gx"):
     import gxf.extensions.pae           # NOQA
     import gxf.extensions.context       # NOQA
     import gxf.extensions.registers     # NOQA
+    import gxf.extensions.cyclic        # NOQA
