@@ -3,6 +3,7 @@
 import struct
 
 import gxf
+import gdb
 
 from pygments.token import Token
 
@@ -62,7 +63,7 @@ def repr_long_str(s, maxl=None, maxc=6):
         count = 1
 
     total = add_accu(len(s))
-    return "+".join(rep)
+    return " + ".join(rep)
 
 
 class RefChain(list, gxf.Formattable):
@@ -72,6 +73,8 @@ class RefChain(list, gxf.Formattable):
 
         while True:
 
+            addr = addr if isinstance(addr, int) else int(addr)
+
             if any(x[0] == addr for x in chain):
                 val = ...
                 break
@@ -79,6 +82,7 @@ class RefChain(list, gxf.Formattable):
             try:
                 m = memory.get_section_or_map(addr)
                 val = memory.read_ptr(addr)
+                val.fetch_lazy()
             except gxf.MemoryError:
                 break
 
@@ -137,7 +141,7 @@ class RefChain(list, gxf.Formattable):
 
             try:
                 wval = memory.read_str(addr, encoding="utf8")
-                return repr_long_str(wval, 128)
+                return repr_long_str(wval, 70)
 
             except UnicodeDecodeError:
                 # fallthrough
@@ -264,10 +268,6 @@ class Memory(gxf.Formattable):
         self.maps = self._read_maps()
         self.sections = self._read_sections()
 
-        # TODO: implement fallback using a virtual MMap that maps everything.
-        #       let it fail when we try to read from it later on.
-        #       Make sure this idea works before relying on it.
-
     def _read_maps(self):
 
         # Ok if this fails, either the process isn't running or you don't
@@ -308,7 +308,14 @@ class Memory(gxf.Formattable):
 
     def read_ptr(self, addr):
         # TODO: maybe use read_memory stuff ?
-        return gxf.parse_and_eval("*(void **)%#x" % addr)
+
+        try:
+            val = gxf.parse_and_eval("*(void **)%#x" % addr)
+            val.fetch_lazy()
+        except gdb.MemoryError as e:
+            raise gxf.MemoryError(e)
+
+        return val
 
     def read_str(self, addr, *args, **kwargs):
         ptr = gxf.parse_and_eval("(char *)%#x" % addr)
