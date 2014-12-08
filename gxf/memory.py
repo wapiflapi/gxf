@@ -86,17 +86,18 @@ class RefChain(list, gxf.Formattable):
             except gxf.MemoryError:
                 break
 
-            chain.append([addr, m, val])
+            chain.append([addr, m, val, val])
             addr = val
 
         if not chain:
             # This wasn't even a valid pointer. We use the wanabee
             # address as value. (maybe taken from a register or other)
-            chain.append([None, None, addr])
+            chain.append([None, None, addr, addr])
 
         # Now we examine the last element of the chain and we
         # try to find a better representation of its value.
-        chain[-1][2] = self.guesstype(memory, *chain[-1])
+        addr, m, val, _ = chain[-1]
+        chain[-1][3] = self.guesstype(memory, addr, m, val)
 
         self.chain = chain
 
@@ -141,7 +142,7 @@ class RefChain(list, gxf.Formattable):
 
             try:
                 wval = memory.read_str(addr, encoding="utf8")
-                return repr_long_str(wval, 70)
+                return repr_long_str(wval, 50)
 
             except UnicodeDecodeError:
                 # fallthrough
@@ -164,22 +165,22 @@ class RefChain(list, gxf.Formattable):
 
     def fmttokens(self):
 
-        for addr, m, val in self[:-1]:
+        for addr, m, val, rep in self[:-1]:
             yield from m.fmtaddr(addr)
             yield (Token.Comment, " : ")
 
         # The last element is special, we want to check if it can
         # format itself. We also have some special handling for
         # known types such as DisasselmblyLines.
-        addr, mmap, val = self[-1]
+        addr, mmap, val, rep = self[-1]
 
-        if isinstance(val, gxf.DisassemblyLine):
+        if isinstance(rep, gxf.DisassemblyLine):
             # We format the address itself the way we do the others
             # but we let the instruction print the ':' because it
             # might want to print the function name before it.
             yield from mmap.fmtaddr(addr)
             yield (Token.Text, " ")
-            yield from val.fmttokens(offset=val.addressidx + 1,
+            yield from rep.fmttokens(offset=rep.addressidx + 1,
                                      skipleading=True, style=None)
 
         else:
@@ -187,18 +188,16 @@ class RefChain(list, gxf.Formattable):
                 yield from mmap.fmtaddr(addr)
                 yield (Token.Comment, " : ")
 
-            if isinstance(val, gxf.Formattable):
-                yield from val.fmttokens()
-            elif isinstance(val, str):
-                yield (Token.Text, "%s" % val)
-            elif 0x20 < val < 0x7e:
-                yield (Token.Numeric.Integer, str(val))
-                yield (Token.Comment, " %r" % chr(val))
+            if isinstance(rep, gxf.Formattable):
+                yield from rep.fmttokens()
             elif val < 256:
-                yield (Token.Numeric.Integer, str(val))
+                yield (Token.Numeric.Integer, "%d" % val)
+                if 0x20 < val < 0x7e:
+                    yield (Token.Comment, " %r" % chr(val))
             else:
-                yield (Token.Numeric.Integer, "%#x")
-
+                yield (Token.Numeric.Integer, "%#x" % val)
+                if isinstance(rep, str):
+                    yield (Token.Comment, " %s" % rep)
 
 class MMap(gxf.Formattable):
 

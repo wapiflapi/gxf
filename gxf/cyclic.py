@@ -28,6 +28,10 @@ class debruijn(object):
 
         yield from db(1, 1)
 
+    def cycle(self):
+        while True:
+            yield from self
+
     def offsets(self, x):
 
         x = list(x)
@@ -45,4 +49,5 @@ class debruijn(object):
             start, stop, step = index.start, index.stop, index.step
         else:
             start, stop, step = index, index + 1, 1
-        return list(itertools.islice(self, start, stop, step))
+        return list(itertools.islice(self.cycle(), start, stop, step))
+
