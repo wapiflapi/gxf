@@ -11,6 +11,8 @@ except ImportError:
 else:
     GDB = True
 
+from gxf.cyclic import *
+
 if GDB:
     from gxf.formatting import *
     from gxf.basics import *
