@@ -21,7 +21,8 @@ class Heading(gxf.DataCommand):
                 args.what, count=args.count + args.before, offset=-args.before)
         except gxf.MemoryError as e:
             if e.address == args.what:
-                print("Invalid address %#x." % e.address)
+                memory = gxf.Memory()
+                print("Invalid address %s." % memory.refchain(e.address).format())
                 return
             else:
                 # This is probably a bug :S

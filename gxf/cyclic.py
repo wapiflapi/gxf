@@ -2,10 +2,15 @@
 # -*- coding: utf-8 -*-
 
 import itertools
+import string
+
+# This provides 446 kb and is easily recognizable.
+dfltalphabet = string.ascii_lowercase
+dfltlength = 4
 
 class debruijn(object):
 
-    def __init__(self, a, n):
+    def __init__(self, a=dfltalphabet, n=dfltlength):
         self.k = len(a)
         self.a = a
         self.n = n
