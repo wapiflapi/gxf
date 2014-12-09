@@ -21,8 +21,10 @@ def parse_and_eval(*args, **kwargs):
     if debug:
         print("[debug] pae: %s %s" % (args, kwargs))
 
-    return gdb.parse_and_eval(*args, **kwargs)
-
+    try:
+        return gdb.parse_and_eval(*args, **kwargs)
+    except gdb.MemoryError as e:
+        raise gxf.MemoryError(e)
 
 class Expression(gxf.Formattable):
 

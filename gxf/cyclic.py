@@ -5,7 +5,7 @@ import itertools
 import string
 
 # This provides 446 kb and is easily recognizable.
-dfltalphabet = string.ascii_lowercase
+dfltalphabet = bytes(string.ascii_lowercase, "utf8")
 dfltlength = 4
 
 class DeBruijn(object):
@@ -42,7 +42,7 @@ class DeBruijn(object):
             start, stop, step = index.start, index.stop, index.step
         else:
             start, stop, step = index, index + 1, 1
-        return itertools.islice(self.cycle(), start, stop, step)
+        return bytearray(itertools.islice(self.cycle(), start, stop, step))
 
     def offsets(self, x):
 

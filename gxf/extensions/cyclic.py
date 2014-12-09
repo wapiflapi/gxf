@@ -20,7 +20,7 @@ class cyclic(gxf.DataCommand):
         db = gxf.cyclic.DeBruijn(a=args.alphabet, n=args.ordern)
 
         if args.search is not None:
-            for offset in db.offsets(args.search):
+            for offset in db.offsets(args.search.encode("utf8")):
                 print(offset)
         else:
             print("".join(db[:args.length]))

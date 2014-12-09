@@ -777,10 +777,24 @@ def disassemble_heading(addr, count=10, offset=0):
             branch = i + 1
             break
 
+    if heading is not None:
+
+        try:
+            heading.fetch_lazy()
+        except gdb.MemoryError as e:
+            # TODO: find a way to represent invalid ptr to pc here?
+            heading = None
+
     # We're not interested if branch is last line.
     if heading and branch < count:
 
-        future = disassemble_lines(heading, count - i, ignfct=True)
+        try:
+            future = disassemble_lines(heading, count - i, ignfct=True)
+        except gxf.MemoryError as e:
+            # TODO: find a way to represent invalid pc here?
+            pass
+
+    if future is not None:
         for i, line in enumerate(future):
             if line.itype is RET:
                 stop = i
