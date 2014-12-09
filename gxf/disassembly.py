@@ -472,7 +472,7 @@ class DisassemblyLine(gxf.Formattable):
 
         return gxf.Expression(ctokens)
 
-    def get_heading(self, stack="$rsp"):
+    def get_heading(self, stack="$sp"):
 
         # We need three primitives:
         #   compute_jmp_addr  (flags + expression)
