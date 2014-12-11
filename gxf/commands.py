@@ -221,6 +221,8 @@ class Command(gdb.Command):
         try:
             args = self.parser.parse_args(args)
             self.run(args)
+        except KeyboardInterrupt as e:
+            pass
         except SystemExit as e:
             if isinstance(e.code, int):
                 raise gdb.GdbError("command exited with status %s." % e.code)

@@ -2,9 +2,9 @@
 
 import gdb
 import gxf
+import sys
 
 debug = False
-
 
 def execute(cmd, tty=False, tostr=True):
 
@@ -25,6 +25,7 @@ def parse_and_eval(*args, **kwargs):
         return gdb.parse_and_eval(*args, **kwargs)
     except gdb.MemoryError as e:
         raise gxf.MemoryError(e)
+
 
 class Expression(gxf.Formattable):
 
