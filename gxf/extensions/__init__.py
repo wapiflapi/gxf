@@ -21,6 +21,7 @@ with gxf.register.prefix("gx"):
     import gxf.extensions.reload        # NOQA
     import gxf.extensions.meta          # NOQA
     import gxf.extensions.testi         # NOQA
+    import gxf.extensions.binexpect     # NOQA
 
     import gxf.extensions.telescope     # NOQA
     import gxf.extensions.addr          # NOQA

@@ -86,6 +86,13 @@ class FileType(argparse.FileType):
     argcompleter = GdbCompleter(gdb.COMPLETE_FILENAME)
 
 
+class FilePathType(object):
+    argcompleter = GdbCompleter(gdb.COMPLETE_FILENAME)
+
+    def __call__(self, arg):
+        return arg
+
+
 class InferiorType(object):
 
     @staticmethod
