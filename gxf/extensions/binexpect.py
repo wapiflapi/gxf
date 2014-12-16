@@ -9,7 +9,7 @@ import argparse
 import gxf
 
 
-# This function is sotlen from binexpect.
+# This function is stolen from binexpect.
 def spawn_terminal(terminal, *cmdline):
     '''
     There doesn't seem to be a portable way of starting a terminal.
@@ -83,9 +83,10 @@ class Binexpect(gxf.UserCommand):
         targetargs = data.split("\x00")
         tty, targetargs = targetargs[0], targetargs[1:]
 
-        print("Found tty at %s" % tty)
+        print("binexpect started tty at %s" % tty)
+        print("binexpect recommends run %s" % " ".join(targetargs))
+
         gxf.execute("set inferior-tty %s" % tty)
 
         if not args.wait:
-            print("run %s" % " ".join(targetargs))
             gxf.execute("run %s" % " ".join(targetargs))
