@@ -26,7 +26,7 @@ class Context(gxf.DataCommand):
 
         if args.regs:
             section("registers")
-            gxf.execute("gx registers", True, False)
+            gxf.execute("gx registers -M", True, False)
 
         if args.code:
             section("code")
