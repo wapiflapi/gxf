@@ -9,7 +9,7 @@ class cyclic(gxf.DataCommand):
     '''
 
     def setup(self, parser):
-        parser.add_argument("-a", "--alphabet", default=gxf.cyclic.dfltalphabet)
+        parser.add_argument("-a", "--alphabet", default=gxf.cyclic.dfltalphabet.decode("utf8"))
         parser.add_argument("-n", "--ordern", type=int, default=gxf.cyclic.dfltlength)
         parser.add_argument("length", nargs="?", type=int, default=256)
 
@@ -17,10 +17,12 @@ class cyclic(gxf.DataCommand):
 
     def run(self, args):
 
-        db = gxf.cyclic.DeBruijn(a=args.alphabet.encode("utf8"), n=args.ordern)
+        args.alphabet = args.alphabet.encode("utf8")
+        db = gxf.cyclic.DeBruijn(a=args.alphabet, n=args.ordern)
 
         if args.search is not None:
-            for offset in db.offsets(args.search.encode("utf8")):
+            args.search = args.search.encode("utf8")
+            for offset in db.offsets(args.search):
                 print(offset)
         else:
             print("".join("%c" % c for c in db[:args.length]))

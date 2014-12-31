@@ -42,6 +42,7 @@ class DeBruijn(object):
             start, stop, step = index.start, index.stop, index.step
         else:
             start, stop, step = index, index + 1, 1
+
         return bytearray(itertools.islice(self.cycle(), start, stop, step))
 
     def offsets(self, x):
