@@ -33,6 +33,7 @@ How to compile gdb with python3:
 --------------------------------
 
 .. code-block:: none
+
    $ git clone git://sourceware.org/git/binutils-gdb.git
    $ cd binutils-gdb
    $ ./configure --with-python=python3
