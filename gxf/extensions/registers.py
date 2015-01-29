@@ -46,10 +46,11 @@ class Registers(gxf.DataCommand):
         tomark = args.mark[:]
 
         if args.mark_used:
-            dis = gxf.disassemble_lines(gxf.parse_and_eval("$pc")).lines[0]
-            for _, t in dis.tokens[dis.instidx:]:
-                tomark.append(t)
-                tomark.extend(self.register_map.get(t, ()))
+            dis = gxf.disassemble_lines(gxf.parse_and_eval("$pc"))
+            for line in dis.lines[:1]:
+                for _, t in line.tokens[line.instidx:]:
+                    tomark.append(t)
+                    tomark.extend(self.register_map.get(t, ()))
 
         for reg, val in regs.regs.items():
             if reg == "eflags" or (len(reg) == 2 and reg[1] == "s"):
