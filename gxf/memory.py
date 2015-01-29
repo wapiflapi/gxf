@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import struct
+import itertools
 
 import gxf
 import gdb
@@ -217,6 +218,15 @@ class MMap(gxf.Formattable):
     def __contains__(self, addr):
         return self.start <= addr < self.end
 
+    def __lt__(self, other):
+        if self.start < other.start:
+            return True
+        if other.start < self.start:
+            return False
+        if self.end > other.end:
+            return True
+        return False
+
     def fmttokens(self):
 
         ttype = Token.Comment
@@ -229,7 +239,7 @@ class MMap(gxf.Formattable):
         if "w" in self.perms and "x" in self.perms:
             ttype = Token.Generic.Deleted
 
-        yield (ttype, "%#x-%#x %s %s %s\n" % (
+        yield (ttype, "%#18x - %#-18x %4s %s\t%s\n" % (
                 self.start, self.end, self.perms,
                 self.backing, self.comment or ""))
 
@@ -346,10 +356,7 @@ class Memory(gxf.Formattable):
         return RefChain(self, addr)
 
     def fmttokens(self, address=None):
-        for section in self.sections:
-            if address is None or address in section:
-                yield from section.fmttokens()
-        for mmap in self.maps:
+        for mmap in sorted(itertools.chain(self.sections, self.maps)):
             if address is None or address in mmap:
                 yield from mmap.fmttokens()
 
