@@ -11,27 +11,6 @@ class Registers(gxf.DataCommand):
     Shows registers.
     '''
 
-    register_map = {
-        "al": ("ax", "eax", "rax"), "ah": ("ax", "eax", "rax"),
-        "bl": ("bx", "ebx", "rbx"), "bh": ("bx", "ebx", "rbx"),
-        "cl": ("cx", "ecx", "rcx"), "ch": ("cx", "ecx", "rcx"),
-        "dl": ("dx", "edx", "rdx"), "dh": ("dx", "edx", "rdx"),
-        "ax": ("eax", "rax"),
-        "bx": ("ebx", "rbx"),
-        "cx": ("ecx", "rcx"),
-        "dx": ("edx", "rdx"),
-        "eax": ("rax",),
-        "ebx": ("rbx",),
-        "ecx": ("rcx",),
-        "edx": ("rdx",),
-        "esi": ("rsi",),
-        "edi": ("rdi",),
-        "ebp": ("rbp",),
-        "esp": ("rdp",),
-        "eip": ("rip",),
-        "pc": ("eip", "rip"),
-        }
-
     def setup(self, parser):
         parser.add_argument("-m", "--mark", action='append', default=[],
                             help="Highlight some registers.")
@@ -46,11 +25,14 @@ class Registers(gxf.DataCommand):
         tomark = args.mark[:]
 
         if args.mark_used:
-            dis = gxf.disassemble_lines(gxf.parse_and_eval("$pc"))
-            for line in dis.lines[:1]:
+            try:
+                dis = gxf.disassemble_lines(regs.get('pc')).lines[:1]
+            except gxf.GdbError:
+                dis = ()
+            for line in dis:
                 for _, t in line.tokens[line.instidx:]:
                     tomark.append(t)
-                    tomark.extend(self.register_map.get(t, ()))
+                    tomark.extend(regs.impact.get(t, ()))
 
         for reg, val in regs.regs.items():
             if reg == "eflags" or (len(reg) == 2 and reg[1] == "s"):

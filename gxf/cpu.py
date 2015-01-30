@@ -20,6 +20,27 @@ class Registers(object):
     EFLAGS_DF = 1 << 10
     EFLAGS_OF = 1 << 11
 
+    impact = {
+        "al": ("ax", "eax", "rax"), "ah": ("ax", "eax", "rax"),
+        "bl": ("bx", "ebx", "rbx"), "bh": ("bx", "ebx", "rbx"),
+        "cl": ("cx", "ecx", "rcx"), "ch": ("cx", "ecx", "rcx"),
+        "dl": ("dx", "edx", "rdx"), "dh": ("dx", "edx", "rdx"),
+        "ax": ("eax", "rax"),
+        "bx": ("ebx", "rbx"),
+        "cx": ("ecx", "rcx"),
+        "dx": ("edx", "rdx"),
+        "eax": ("rax",),
+        "ebx": ("rbx",),
+        "ecx": ("rcx",),
+        "edx": ("rdx",),
+        "esi": ("rsi",),
+        "edi": ("rdi",),
+        "ebp": ("rbp",),
+        "esp": ("rdp",),
+        "eip": ("rip",),
+        "pc": ("eip", "rip"),
+        }
+
     def __init__(self):
         data = gxf.execute("info registers", False, True)
 
@@ -41,3 +62,13 @@ class Registers(object):
         self.flags["IF"] = bool(eflags & self.EFLAGS_IF)
         self.flags["DF"] = bool(eflags & self.EFLAGS_DF)
         self.flags["OF"] = bool(eflags & self.EFLAGS_OF)
+
+    def get(self, reg):
+        """
+        This does not always return the exact value of a register.
+        For example .get('al') will return the value of rax.
+        """
+
+        while reg not in self.regs:
+            reg = self.impact[reg][0]
+        return self.regs[reg]
