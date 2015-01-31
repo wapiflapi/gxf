@@ -26,8 +26,8 @@ How to use:
    $ gdb
    (gdb) python import gxf.extensions
    (gdb) help gx
-   
-   
+
+
  
 How to compile gdb with python3:
 --------------------------------
@@ -38,3 +38,28 @@ How to compile gdb with python3:
    $ cd binutils-gdb
    $ ./configure --with-python=python3
    $ make && sudo make install
+
+
+
+How to cuse peda alongside gxf:
+-------------------------------
+
+.. code-block:: diff
+
+  diff --git a/peda.py b/peda.py
+  index fd5b8d9..cc74b07 100644
+  --- a/peda.py
+  +++ b/peda.py
+  @@ -5965,8 +5965,9 @@ signal.signal(signal.SIGINT, sigint_handler)
+  
+  # custom hooks
+  peda.define_user_command("hook-stop",
+  -    "peda context\n"
+  -    "session autosave"
+  +    "\n"
+  +    # "peda context\n"
+  +    # "session autosave"
+       )
+ 
+   # common used shell commands aliases
+
