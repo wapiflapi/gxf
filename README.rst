@@ -17,6 +17,7 @@ Gdb Extension Framework is a bunch of python code around the gdb api.
 * Free software: MIT license
 * Documentation: https://gxf.readthedocs.org
 
+
 How to use:
 -----------
 
@@ -28,7 +29,6 @@ How to use:
    (gdb) help gx
 
 
- 
 How to compile gdb with python3:
 --------------------------------
 
@@ -38,7 +38,6 @@ How to compile gdb with python3:
    $ cd binutils-gdb
    $ ./configure --with-python=python3
    $ make && sudo make install
-
 
 
 How to cuse peda alongside gxf:
@@ -51,7 +50,7 @@ How to cuse peda alongside gxf:
   --- a/peda.py
   +++ b/peda.py
   @@ -5965,8 +5965,9 @@ signal.signal(signal.SIGINT, sigint_handler)
-  
+
   # custom hooks
   peda.define_user_command("hook-stop",
   -    "peda context\n"
@@ -60,6 +59,22 @@ How to cuse peda alongside gxf:
   +    # "peda context\n"
   +    # "session autosave"
        )
- 
+
    # common used shell commands aliases
 
+
+FAQ
+---
+
+* ``TypeError: int() argument must be a string or a number, not 'list'``
+
+  This error is *probably* due to your argcomplete version being too old and
+  having bugs. See requirements.txt for the minimum version you need.
+
+* I keep seeing lots of other tracebacks.
+
+  That is expected for the moment, I'm focusing on the framework and don't
+  bother catching all the exception in the extensions where I should be
+  displaying decent error messages. This will be done in the future, but for the
+  moment it is normal if you see tracebacks when gxf tries to access program
+  memory that isn't mapped. This happend for example when rip or rsp is invalid.
