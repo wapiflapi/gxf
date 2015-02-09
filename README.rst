@@ -17,6 +17,7 @@ Gdb Extension Framework is a bunch of python code around the gdb api.
 * Free software: MIT license
 * Documentation: https://gxf.readthedocs.org
 
+.. image:: http://i.imgur.com/o5lTnZH.png
 
 How to use:
 -----------
