@@ -41,8 +41,8 @@ How to compile gdb with python3:
    $ make && sudo make install
 
 
-How to cuse peda alongside gxf:
--------------------------------
+How to use peda alongside gxf:
+------------------------------
 
 .. code-block:: diff
 
