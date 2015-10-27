@@ -39,13 +39,14 @@ class Registers(gxf.DataCommand):
                 continue
 
             if reg == "cpsr":
-                print("%s%s%s%s%s %s" % (
-                        Formattable(((ttype, "%-4s" % reg),(Token.Comment, ": "))),
-                                            ['v','V'][regs.flags['V']],
-                                            ['c','C'][regs.flags['C']],
-                                            ['z','Z'][regs.flags['Z']],
-                                            ['n','N'][regs.flags['N']],
-                                            memory.refchain(val)))
+                print("%sN:%s Z:%s C:%s V:%s %s" % (
+                        Formattable(((ttype, "%-4s" % reg),
+                            (Token.Comment, ": "))),
+                        str(int(regs.flags['V'])),
+                        str(int(regs.flags['C'])),
+                        str(int(regs.flags['Z'])),
+                        str(int(regs.flags['N'])),
+                        memory.refchain(val)))
                 continue
 
 
