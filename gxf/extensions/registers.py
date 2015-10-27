@@ -38,6 +38,17 @@ class Registers(gxf.DataCommand):
             if reg == "eflags" or (len(reg) == 2 and reg[1] == "s"):
                 continue
 
+            if reg == "cpsr":
+                print("%s%s%s%s%s %s" % (
+                        Formattable(((ttype, "%-4s" % reg),(Token.Comment, ": "))),
+                                            ['v','V'][regs.flags['V']],
+                                            ['c','C'][regs.flags['C']],
+                                            ['z','Z'][regs.flags['Z']],
+                                            ['n','N'][regs.flags['N']],
+                                            memory.refchain(val)))
+                continue
+
+
             if reg in tomark:
                 ttype = Token.Name.Builtin
             elif reg in ("rdi", "rsi", "rdx", "rcx", "r8", "r9"):
@@ -51,3 +62,4 @@ class Registers(gxf.DataCommand):
                     Formattable(((ttype, "%-4s" % reg),
                                  (Token.Comment, ": "))),
                     memory.refchain(val)))
+
