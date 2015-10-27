@@ -70,7 +70,7 @@ class Registers(object):
             self.flags["IF"] = bool(eflags & self.EFLAGS_IF)
             self.flags["DF"] = bool(eflags & self.EFLAGS_DF)
             self.flags["OF"] = bool(eflags & self.EFLAGS_OF)
-        else: # ARM
+        elif 'cpsr' in self.regs: # ARM
             cpsr = self.regs["cpsr"]
 
             self.flags["N"] = bool(cpsr & self.CPSR_N)
