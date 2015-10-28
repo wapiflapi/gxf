@@ -35,20 +35,8 @@ class Registers(gxf.DataCommand):
                     tomark.extend(regs.impact.get(t, ()))
 
         for reg, val in regs.regs.items():
-            if reg == "eflags" or (len(reg) == 2 and reg[1] == "s"):
+            if reg == "cpsr" or reg == "eflags" or (len(reg) == 2 and reg[1] == "s"):
                 continue
-
-            if reg == "cpsr":
-                print("%sN:%s Z:%s C:%s V:%s %s" % (
-                        Formattable(((ttype, "%-4s" % reg),
-                            (Token.Comment, ": "))),
-                        str(int(regs.flags['V'])),
-                        str(int(regs.flags['C'])),
-                        str(int(regs.flags['Z'])),
-                        str(int(regs.flags['N'])),
-                        memory.refchain(val)))
-                continue
-
 
             if reg in tomark:
                 ttype = Token.Name.Builtin
