@@ -200,7 +200,7 @@ class RefChain(list, gxf.Formattable):
                 if 0x20 < val < 0x7e:
                     yield (Token.Comment, " %r" % chr(val))
             else:
-                yield (Token.Numeric.Integer, "%#x" % val)
+                yield (Token.Numeric.Integer, "%#x" % int(val))
                 if isinstance(rep, str):
                     yield (Token.Comment, " %s" % rep)
 
