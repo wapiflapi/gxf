@@ -87,7 +87,8 @@ class RefChain(list, gxf.Formattable):
             except gxf.MemoryError:
                 break
 
-            chain.append([addr, m, val, val])
+            rep = int(val) & 0xffffffffffffffff
+            chain.append([addr, m, val, rep])
             addr = val
 
         if not chain:
@@ -111,7 +112,7 @@ class RefChain(list, gxf.Formattable):
         # to do this properly.
 
         if val < 256:
-            return val
+            return int(val)
 
         bval = struct.pack("q" if int(val) < 0 else "Q", int(val))
         aval = struct.unpack("Q", bval)[0]
@@ -195,14 +196,17 @@ class RefChain(list, gxf.Formattable):
 
             if isinstance(rep, gxf.Formattable):
                 yield from rep.fmttokens()
-            elif val < 256:
-                yield (Token.Numeric.Integer, "%d" % val)
-                if 0x20 < val < 0x7e:
-                    yield (Token.Comment, " %r" % chr(val))
+            elif isinstance(rep, str):
+                yield (Token.Comment, " %s" % rep)
+            elif isinstance(rep, int):
+                if rep < 256:
+                    yield (Token.Numeric.Integer, "%d" % rep)
+                    if 0x20 < rep < 0x7e:
+                        yield (Token.Comment, " %r" % chr(rep))
+                else:
+                    yield (Token.Numeric.Integer, "%#x" % rep)
             else:
-                yield (Token.Numeric.Integer, "%#x" % int(val))
-                if isinstance(rep, str):
-                    yield (Token.Comment, " %s" % rep)
+                raise RuntimeError("Can't format %r of type %r." % (val, type(val)))
 
 class MMap(gxf.Formattable):
 

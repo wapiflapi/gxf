@@ -18,14 +18,16 @@ class Telescope(gxf.DataCommand):
 
     def run(self, args):
 
-        size = int(args.size or gxf.cpu.get_addrsz())
-        start = int(args.what - args.before * size)
-        end = int(args.until or args.what + args.count * size)
+        size = args.size or gxf.cpu.get_addrsz()
+        start = args.what - args.before * size
+        end = args.until or args.what + args.count * size
 
         memory = gxf.Memory()
 
-        for addr in range(start, end, size):
-            offset = addr - int(args.what)
+        # FIXME: WTF. need to find a gdb solution or a gxf hack.
+        def posint(x): return int(x) & 0xffffffffffffffff
+        for addr in range(posint(start), posint(end), posint(size)):
+            offset = addr - posint(args.what)
             refchain = memory.refchain(addr)
 
             print("%2.d " % (offset, ), end="")
