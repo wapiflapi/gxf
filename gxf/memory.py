@@ -126,16 +126,18 @@ class RefChain(list, gxf.Formattable):
             invalid = e.start
             sval = bval[:invalid].decode("utf8")
 
-        nullbyte = sval.find("\x00")
-        wval = sval[:nullbyte] if nullbyte >= 0 else sval
+        wvals = sval.split('\x00')
+        while len(wvals) > 1 and len(wvals[-1]) == 0:
+            del wvals[-1]
+        wval = wvals[0]
 
-        if len(wval) == 8 or len(wval) == 4:
-            # 4 bytes might be ok if this is 32 bit.
+
+        if sum(len(w) for w in wvals) >= 3:
 
             if m is None or addr is None:
-                # This didnt come from an address.
-                # We can't read the full string.
-                return repr(wval)
+                # This didnt come from an address, We can't read single full string.
+                # Check for multiple strings, we're probably dumping data.
+                return ', '.join(repr(wval))
 
             # Read full string if al 8 bytes are good (and no nullbyte)
             # this should also reduce false positives with bytecode since
@@ -152,13 +154,6 @@ class RefChain(list, gxf.Formattable):
 
             if wval is not None:
                 return repr_long_str(wval, 50)
-
-        elif 3 <= len(wval) < 8 and invalid != len(wval):
-            return repr(wval)
-        elif 2 <= len(wval) < 8 and invalid is None:
-            # We might not have had more than three characters but this
-            # might still be somewhere where a lot of printable data is.
-            return repr(wval)
 
         if m is not None and "x" in m.perms:
             # Not a string and executable, this might be disassembly.
