@@ -68,7 +68,7 @@ def repr_long_str(s, maxl=None, maxc=6):
 
 
 class RefChain(list, gxf.Formattable):
-    def __init__(self, memory, addr):
+    def __init__(self, memory, addr, maxlen=4):
 
         chain = []
 
@@ -95,6 +95,10 @@ class RefChain(list, gxf.Formattable):
             # This wasn't even a valid pointer. We use the wanabee
             # address as value. (maybe taken from a register or other)
             chain.append([None, None, addr, addr])
+
+        self.abreviated = max(0, len(chain) - maxlen)
+        if self.abreviated:
+            chain = chain[:maxlen-1] + [chain[-1]]
 
         # Now we examine the last element of the chain and we
         # try to find a better representation of its value.
@@ -166,9 +170,16 @@ class RefChain(list, gxf.Formattable):
 
     def fmttokens(self):
 
+        first = False
         for addr, m, val, rep in self[:-1]:
+            if not first:
+                yield (Token.Comment, " : ")
             yield from m.fmtaddr(addr)
+
+        if not self.abreviated:
             yield (Token.Comment, " : ")
+        else:
+            yield (Token.Comment, " :%d: " % self.abreviated)
 
         # The last element is special, we want to check if it can
         # format itself. We also have some special handling for
