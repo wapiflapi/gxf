@@ -140,8 +140,8 @@ class RefChain(list, gxf.Formattable):
 
             if m is None or addr is None:
                 # This didnt come from an address, We can't read single full string.
-                # Check for multiple strings, we're probably dumping data.
-                return ', '.join(repr(wval))
+                # But that probably means we're dumping a data zone, so dump multi.
+                return repr(sval)
 
             # Read full string if al 8 bytes are good (and no nullbyte)
             # this should also reduce false positives with bytecode since
@@ -170,16 +170,19 @@ class RefChain(list, gxf.Formattable):
 
     def fmttokens(self):
 
-        first = False
+        first = True
+
         for addr, m, val, rep in self[:-1]:
             if not first:
                 yield (Token.Comment, " : ")
+            first = False
             yield from m.fmtaddr(addr)
 
-        if not self.abreviated:
-            yield (Token.Comment, " : ")
-        else:
-            yield (Token.Comment, " :%d: " % self.abreviated)
+        if not first:
+            if not self.abreviated:
+                yield (Token.Comment, " : ")
+            else:
+                yield (Token.Comment, " :%d: " % self.abreviated)
 
         # The last element is special, we want to check if it can
         # format itself. We also have some special handling for
@@ -203,7 +206,7 @@ class RefChain(list, gxf.Formattable):
             if isinstance(rep, gxf.Formattable):
                 yield from rep.fmttokens()
             elif isinstance(rep, str):
-                yield (Token.Comment, " %s" % rep)
+                yield (Token.Comment, "%s" % rep)
             elif isinstance(rep, int):
                 if rep < 256:
                     yield (Token.Numeric.Integer, "%d" % rep)
