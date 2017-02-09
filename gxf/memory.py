@@ -135,13 +135,12 @@ class RefChain(list, gxf.Formattable):
             del wvals[-1]
         wval = wvals[0]
 
-
         if sum(len(w) for w in wvals) >= 3:
 
             if m is None or addr is None:
                 # This didnt come from an address, We can't read single full string.
                 # But that probably means we're dumping a data zone, so dump multi.
-                return repr(sval)
+                return '%r (%#x)' % (wval, aval)
 
             # Read full string if al 8 bytes are good (and no nullbyte)
             # this should also reduce false positives with bytecode since
