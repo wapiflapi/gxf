@@ -13,6 +13,7 @@ class Context(gxf.DataCommand):
         parser.add_argument("-r", "--regs", action="store_true")
         parser.add_argument("-c", "--code", action="store_true")
         parser.add_argument("-s", "--stack", action="store_true")
+        parser.add_argument("-f", "--frame", action="store_true")
 
     def run(self, args):
 
@@ -23,6 +24,7 @@ class Context(gxf.DataCommand):
             args.regs = True
             args.code = True
             args.stack = True
+            args.frame = True
 
         if args.regs:
             section("registers")
@@ -35,3 +37,7 @@ class Context(gxf.DataCommand):
         if args.stack:
             section("stack")
             gxf.execute("gx telescope $sp -c8", True, False)
+
+        if args.frame:
+            section("frame")
+            gxf.execute("frame", True, False)
