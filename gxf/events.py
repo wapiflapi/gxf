@@ -100,6 +100,7 @@ class ExecutingHandler(Handler):
 
     def handle(self, *args, **kwargs):
         for cmd in self.cmds:
-            gxf.execute(cmd, tty=True, tostr=False)
+            with gxf.errors.allow_errors():
+                gxf.execute(cmd, tty=True, tostr=False)
 
 prompt.connect(ExecutingHandler("gx context", onlyafter=(stop,)))

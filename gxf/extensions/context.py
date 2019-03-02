@@ -28,16 +28,20 @@ class Context(gxf.DataCommand):
 
         if args.regs:
             section("registers")
-            gxf.execute("gx registers -M", True, False)
+            with gxf.errors.allow_errors():
+                gxf.execute("gx registers -M", True, False)
 
         if args.code:
             section("code")
-            gxf.execute("gx heading $pc -b3 -c5", True, False)
+            with gxf.errors.allow_errors():
+                gxf.execute("gx heading $pc -b3 -c5", True, False)
 
         if args.stack:
             section("stack")
-            gxf.execute("gx telescope $sp -c8", True, False)
+            with gxf.errors.allow_errors():
+                gxf.execute("gx telescope $sp -c8", True, False)
 
         if args.frame:
             section("frame")
-            gxf.execute("frame", True, False)
+            with gxf.errors.allow_errors():
+                gxf.execute("frame", True, False)

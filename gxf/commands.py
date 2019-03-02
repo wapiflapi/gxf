@@ -9,8 +9,7 @@ from contextlib import contextmanager
 import argcomplete
 
 import gdb
-
-from gxf import inferiors
+import gxf
 
 
 class GdbCompleterRequired(Exception):
@@ -97,12 +96,12 @@ class InferiorType(object):
 
     @staticmethod
     def argcompleter(prefix, **kwargs):
-        iids = [str(i.num) for i in inferiors.get_inferiors()]
+        iids = [str(i.num) for i in gxf.inferiors.get_inferiors()]
         return [i for i in iids if i.startswith(prefix)]
 
     def __call__(self, arg):
         try:
-            return inferiors.get_inferior_by_id(int(arg))
+            return gxf.inferiors.get_inferior_by_id(int(arg))
         except (ValueError, KeyError) as e:
             raise argparse.ArgumentTypeError(e)
 
@@ -209,7 +208,7 @@ class Command(gdb.Command):
     def setup_inferior(self, parser):
         parser.add_argument(
             '-i', '--inferior',
-            default=parser.JitDefault(inferiors.get_selected_inferior),
+            default=parser.JitDefault(gxf.inferiors.get_selected_inferior),
             type=InferiorType(),
             help="inferior id on which this command should act"
             ", defaults to selected inferior.")
@@ -236,18 +235,17 @@ class Command(gdb.Command):
             elif e.code:
                 raise gdb.GdbError(str(e))
         except gdb.GdbError:
-            # This type of error can be used to repport failure to gdb.
+            # This type of error can be used to report failure to gdb.
             # We let is pass through so that applications can print errors.
             # Still, the prefered way for an extension to do this
             # would be to simply use exit().
             raise
         except BaseException as e:
+            # This is a bug or unexpected circumstance.
             if getattr(args, "isatty", True):
-                # Gdb can't give us a full traceback. If this is a tty
-                # or if error occured during argument parsing we do it.
-                print("%s" % (traceback.format_exc(),), end="")
+                gxf.errors.show_error(e)
             else:
-                raise gdb.GdbError(e)
+                raise
 
     def complete(self, text, word):
 

@@ -28,7 +28,7 @@ How to use:
    $ gdb
    (gdb) python import gxf.extensions
    (gdb) help gx
-
+   (gdb) python gxf.basics.debug = True
 
 How to compile gdb with python3:
 --------------------------------
