@@ -11,6 +11,7 @@ import argcomplete
 import gdb
 import gxf
 
+import gxf.inferiors
 
 class GdbCompleterRequired(Exception):
 
