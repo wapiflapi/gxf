@@ -82,6 +82,13 @@ class RefChain(list, gxf.Formattable):
 
             try:
                 m = memory.get_section_or_map(addr)
+            except gxf.MemoryError:
+                # We have no idea about this memory map,
+                # but if are not about to break it means we
+                # it's still a valid address. Fake it.
+                m = MMap(None, None, "u")
+
+            try:
                 val = memory.read_ptr(addr)
                 val.fetch_lazy()
             except gxf.MemoryError:
@@ -263,6 +270,8 @@ class MMap(gxf.Formattable):
             token = Token.Keyword
         elif "r" in self.perms:
             token = Token.Generic.Inserted
+        elif "u" in self.perms:
+            token = Token.Comment
         else:
             token = Token.Text
 
