@@ -352,10 +352,13 @@ class Memory(gxf.Formattable):
         return val
 
     def read_str(self, addr, *args, maxlen=4096, **kwargs):
-        if maxlen is not None:
-            ptr = gxf.parse_and_eval("*(char (*)[%d])%#x" % (maxlen, addr))
-        else:
-            ptr = gxf.parse_and_eval("(char *)%#x" % addr)
+        while maxlen is not None and maxlen > 1:
+            try:
+                ptr = gxf.parse_and_eval("*(char (*)[%d])%#x" % (maxlen, addr))
+                return ptr.string(*args, **kwargs)
+            except:
+                maxlen = maxlen / 2 if maxlen > 16 else 0
+        ptr = gxf.parse_and_eval("(char *)%#x" % addr)
         return ptr.string(*args, **kwargs)
 
     def get_section_or_map(self, addr):
